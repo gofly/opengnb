@@ -260,18 +260,6 @@ gnb_conf_t* gnb_argv(int argc,char *argv[]){
         #endif
     }
 
-    #ifdef __UNIX_LIKE_OS__
-    char gnb_es_bin_path[PATH_MAX+NAME_MAX];
-    snprintf(gnb_es_bin_path,   PATH_MAX+NAME_MAX, "%s/gnb_es",          conf->binary_dir);
-    gnb_arg_append(gnb_es_arg_list, gnb_es_bin_path);
-    #endif
-
-    #ifdef _WIN32
-    char gnb_es_bin_path_q[PATH_MAX+NAME_MAX];
-    snprintf(gnb_es_bin_path_q, PATH_MAX+NAME_MAX, "\"%s\\gnb_es.exe\"",  conf->binary_dir);
-    gnb_arg_append(gnb_es_arg_list, gnb_es_bin_path_q);
-    #endif
-
     int flag;
 
     struct option long_options[] = {
@@ -1018,25 +1006,6 @@ gnb_conf_t* gnb_argv(int argc,char *argv[]){
         snprintf(conf->map_file,        PATH_MAX+NAME_MAX, "%s",       ctl_block_file);
     }
 
-    #ifdef __UNIX_LIKE_OS__
-    gnb_arg_append(gnb_es_arg_list, "-b");
-    gnb_arg_append(gnb_es_arg_list, conf->map_file);
-    #endif
-
-
-    #ifdef _WIN32
-    char gnb_map_path_q[PATH_MAX+NAME_MAX];
-    snprintf(gnb_map_path_q,    PATH_MAX+NAME_MAX, "\"%s\"",              conf->map_file);
-    gnb_arg_append(gnb_es_arg_list, "-b");
-    gnb_arg_append(gnb_es_arg_list, gnb_map_path_q);
-    #endif
-
-    gnb_arg_append(gnb_es_arg_list, "--if-loop");
-
-    if ( 1 == conf->lite_mode ) {
-        gnb_arg_append(gnb_es_arg_list, "--upnp");
-    }
-
     char  resolved_path[PATH_MAX+NAME_MAX];
 
     if ( '\0' != conf->conf_dir[0] && NULL != gnb_realpath(conf->conf_dir,resolved_path) ) {
@@ -1167,6 +1136,35 @@ static void show_useage(int argc,char *argv[]){
     printf("  %s -n 1001 -a \"i/0/$public_index_ip/$port\" --multi-socket=on -p $passcode\n",argv[0]);
     printf("  %s -n 1002 -a \"i/0/$public_index_ip/$port\" --multi-socket=on -p $passcode\n",argv[0]);
 
+}
+
+void gnb_init_es_argv(gnb_conf_t *conf){
+    
+    #ifdef __UNIX_LIKE_OS__
+    char gnb_es_bin_path[PATH_MAX+NAME_MAX];
+    snprintf(gnb_es_bin_path,   PATH_MAX+NAME_MAX, "%s/gnb_es",          conf->binary_dir);
+    gnb_arg_append(gnb_es_arg_list, gnb_es_bin_path);
+
+    gnb_arg_append(gnb_es_arg_list, "-b");
+    gnb_arg_append(gnb_es_arg_list, conf->map_file);
+    #endif
+
+    #ifdef _WIN32
+    char gnb_es_bin_path_q[PATH_MAX+NAME_MAX];
+    snprintf(gnb_es_bin_path_q, PATH_MAX+NAME_MAX, "\"%s\\gnb_es.exe\"",  conf->binary_dir);
+    gnb_arg_append(gnb_es_arg_list, gnb_es_bin_path_q);
+
+    char gnb_map_path_q[PATH_MAX+NAME_MAX];
+    snprintf(gnb_map_path_q,    PATH_MAX+NAME_MAX, "\"%s\"",              conf->map_file);
+    gnb_arg_append(gnb_es_arg_list, "-b");
+    gnb_arg_append(gnb_es_arg_list, gnb_map_path_q);
+    #endif
+
+    gnb_arg_append(gnb_es_arg_list, "--if-loop");
+
+    if ( 1 == conf->lite_mode ) {
+        gnb_arg_append(gnb_es_arg_list, "--upnp");
+    }
 }
 
 void gnb_setup_es_argv(char *es_argv_string){

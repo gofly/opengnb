@@ -48,6 +48,7 @@ int gnb_daemon();
 void save_pid(const char *pid_file);
 
 gnb_conf_t* gnb_argv(int argc,char *argv[]);
+void gnb_init_es_argv(gnb_conf_t *conf);
 
 void primary_process_loop(gnb_core_t *gnb_core);
 
@@ -370,6 +371,8 @@ int main (int argc,char *argv[]){
 
     }
 
+    gnb_init_es_argv(conf);
+    
     free(conf);
 
     if ( NULL == gnb_core ) {
