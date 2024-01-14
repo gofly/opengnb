@@ -260,7 +260,7 @@ static void* thread_worker_func( void *data ) {
         detect_loop(gnb_detect_worker);
 
         if ( detect_worker_ctx->is_send_detect ) {
-            GNB_SLEEP_MILLISECOND(1);
+            GNB_SLEEP_MILLISECOND(50);
         } else {
             GNB_SLEEP_MILLISECOND(1000);
         }
