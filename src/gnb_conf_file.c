@@ -503,6 +503,16 @@ void local_node_file_config(gnb_conf_t *conf){
 
         }
 
+	if ( !strncmp(line_buffer, "node-cache-file", sizeof("node-cache-file")-1) && 0 == conf->systemd_daemon ) {
+
+            num = sscanf(line_buffer, "%32[^ ] %s", field, conf->node_cache_file);
+
+            if ( 2 != num ) {
+                printf("config %s error in [%s]\n", "node-cache-file", node_conf_file);
+                exit(1);
+            }
+
+        }
 
         if ( !strncmp(line_buffer, "es-argv", sizeof("es-argv")-1) ) {
 
