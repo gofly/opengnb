@@ -223,7 +223,7 @@ static void send_detect_addr_frame(gnb_worker_t *gnb_index_worker, gnb_address_t
 
         gnb_send_to_address_through_all_sockets(gnb_core, &address_st, index_worker_ctx->index_frame_payload);
         //need delay
-
+        GNB_SLEEP_MILLISECOND(10);
     }
 
     for ( i=dst_port+1; i<(dst_port+gnb_core->conf->port_detect_range); i++ ) {
@@ -235,7 +235,7 @@ static void send_detect_addr_frame(gnb_worker_t *gnb_index_worker, gnb_address_t
         address_st.port = htons(i);
         gnb_send_to_address_through_all_sockets(gnb_core, &address_st, index_worker_ctx->index_frame_payload);
         //need delay
-
+        GNB_SLEEP_MILLISECOND(10);
     }
 
 }
@@ -879,3 +879,4 @@ gnb_worker_t gnb_index_worker_mod = {
     .ctx       = NULL
 
 };
+
