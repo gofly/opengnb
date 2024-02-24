@@ -4,43 +4,43 @@
 
 ipcalc_line() {
 	local line="$1"
-	local v="${line%|*}"
-	local IP="${v##*|}"
-	local NETMASK="${line##*|}"
-	ipcalc.sh $IP $NETMASK
+	local tmp="${line%|*}"
+	local ip="${tmp##*|}"
+	local netmask="${line##*|}"
+	ipcalc.sh $ip $netmask
 	echo NODEID="${line%%|*}"
 }
 
 ipcalc_for_route_each_line() {
-	local ROUTECONF="$1"
-	local FILTER="$2"
-	local FUNC="$3"
-	cat $ROUTECONF|grep $FILTER|while read line; do
+	local route_conf="$1"
+	local filter="$2"
+	local func="$3"
+	cat $route_conf|grep $filter|while read line; do
 			eval $(ipcalc_line $line|sed 's/^/local /')
-			$FUNC $NODEID $@
+			$func $NODEID $@
 	done
 }
 
 find_same_network_item() {
-	local SNET="$5"
-	local DNET="$6"
-	if [ "$NODEID|$NETWORK|$PREFIX" = "$SNET" ]; then
-			echo "$DNET|$IP"
+	local snet="$5"
+	local dnet="$6"
+	if [ "$NODEID|$NETWORK|$PREFIX" = "$snet" ]; then
+			echo "$dnet|$IP"
 	fi
 }
 
 find_route_network_item() {
-	local NODEID="$1"
-	local ROUTECONF="$2"
-	local SNET="$6"
-	if [ "$NETWORK|$PREFIX" != "$SNET" ]; then
-			ipcalc_for_route_each_line $ROUTECONF "^$NODEID|" find_same_network_item "$NODEID|$SNET" "$NETWORK|$PREFIX"
+	local node_id="$1"
+	local route_conf="$2"
+	local snet="$6"
+	if [ "$NETWORK|$PREFIX" != "$snet" ]; then
+			ipcalc_for_route_each_line $route_conf "^$node_id|" find_same_network_item "$node_id|$snet" "$NETWORK|$PREFIX"
 	fi
 }
 
 gnb_routes() {
-	local item="$1"
-	eval $(ipcalc_line "$item"|sed 's/^/local /g')
+	local line="$1"
+	eval $(ipcalc_line "$line"|sed 's/^/local /g')
 	ipcalc_for_route_each_line $ROUTECONF "-v $NODEID" find_route_network_item "$NETWORK|$PREFIX"
 }
 
@@ -48,10 +48,10 @@ proto_add_gnb_ipv4_routes() {
 	local NODEID="$1"
 	local IPADDR="$2"
 	local NETMASK="$3"
-	local v=""
+	local tmp=""
 	for route in $(gnb_routes "$NODEID|$IPADDR|$NETMASK"); do
-			v="${route#*|}"
-			proto_add_ipv4_route "${route%%|*}" "${v%|*}" "${route##*|}"
+			tmp="${route#*|}"
+			proto_add_ipv4_route "${route%%|*}" "${tmp%|*}" "${route##*|}"
 	done
 }
 
