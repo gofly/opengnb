@@ -71,11 +71,15 @@ proto_gnb_setup() {
 		echo "log-file-path /tmp/log/gnb/${config}"
 	} > $config_dir/node.conf
 	{
-		[ -n "$addresses" ] && echo $addresses | sed 's/~/\n/g' | while read line; do echo $line; done
+		[ -n "$addresses" ] && echo $addresses | sed 's/~/\n/g' | while read line; do
+			(echo "$line" | grep -q "^$nodeid|") || echo $line
+		done
 	} > $config_dir/address.conf
 	{
 		echo "$nodeid|$ipaddr|$netmask"
-		[ -n "$routes" ] && echo $routes | sed 's/~/\n/g' | while read line; do echo $line; done
+		[ -n "$routes" ] && echo $routes | sed 's/~/\n/g' | while read line; do
+			(echo "$line" | grep -q "^$nodeid|") || echo $line
+		done
 	} > $config_dir/route.conf
 
 	mkdir -p /tmp/log/gnb/${config}
