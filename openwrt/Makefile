@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=opengnb
-PKG_VERSION:=1.4.5b
+PKG_VERSION:=1.5.0c
 PKG_RELEASE:=1
 
 # PKG_SOURCE_PROTO:=git

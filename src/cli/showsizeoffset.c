@@ -31,7 +31,7 @@ int main() {
     printf("\tsizeof__gnb_ctl_node_zone_t__node_num=%ld\n", member_size(gnb_ctl_node_zone_t, node_num));
     printf("\n");
     printf("\tsizeof__gnb_node_t=%ld\n", sizeof(gnb_node_t));
-    printf("\tsizeof__gnb_node_t__uuid32=%ld\n", member_size(gnb_node_t, uuid32));
+    printf("\tsizeof__gnb_node_t__uuid64=%ld\n", member_size(gnb_node_t, uuid64));
     printf("\tsizeof__gnb_node_t__in_bytes=%ld\n", member_size(gnb_node_t, in_bytes));
     printf("\tsizeof__gnb_node_t__out_bytes=%ld\n", member_size(gnb_node_t, out_bytes));
     printf("\tsizeof__gnb_node_t__udp_addr_status=%ld\n", member_size(gnb_node_t, udp_addr_status));
@@ -48,7 +48,7 @@ int main() {
     printf("\toffsetof__gnb_ctl_node_zone_t__name=%ld\n", offsetof(gnb_ctl_node_zone_t, name));
     printf("\toffsetof__gnb_ctl_node_zone_t__node_num=%ld\n", offsetof(gnb_ctl_node_zone_t, node_num));
     printf("\n");
-    printf("\toffsetof__gnb_node_t__uuid32=%ld\n", offsetof(gnb_node_t, uuid32));
+    printf("\toffsetof__gnb_node_t__uuid64=%ld\n", offsetof(gnb_node_t, uuid64));
     printf("\toffsetof__gnb_node_t__in_bytes=%ld\n", offsetof(gnb_node_t, in_bytes));
     printf("\toffsetof__gnb_node_t__out_bytes=%ld\n", offsetof(gnb_node_t, out_bytes));
     printf("\toffsetof__gnb_node_t__udp_addr_status=%ld\n", offsetof(gnb_node_t, udp_addr_status));
