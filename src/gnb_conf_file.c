@@ -1191,6 +1191,17 @@ void local_node_file_config(gnb_conf_t *conf){
         }
 
 
+        if ( !strncmp(line_buffer, "fwmark", sizeof("fwmark")-1) ) {
+
+            num = sscanf(line_buffer, "%32[^ ] %d", field, &conf->fwmark);
+
+            if ( 2 != num ) {
+                printf("config %s error in [%s]\n", "fwmark", node_conf_file);
+                exit(1);
+            }
+
+        }
+
     }while(1);
 
     fclose(file);    

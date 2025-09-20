@@ -188,6 +188,7 @@ typedef struct _gnb_conf_t {
 
 	uint8_t addr_secure;
 
+	uint32_t fwmark;
 	uint8_t daemon;
 	uint8_t systemd_daemon;
 
