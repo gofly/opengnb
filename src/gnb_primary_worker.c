@@ -1103,7 +1103,7 @@ static int start(gnb_worker_t *gnb_worker){
 
             gnb_core->udp_ipv6_sockets[i] = socket(AF_INET6, SOCK_DGRAM, 0);
 
-            gnb_bind_udp_socket_ipv6(gnb_core->udp_ipv6_sockets[i], gnb_core->conf->listen_address6_string,  gnb_core->conf->udp6_ports[i]);
+            gnb_bind_udp_socket_ipv6(gnb_core->udp_ipv6_sockets[i], gnb_core->conf->listen_address6_string,  gnb_core->conf->udp6_ports[i], gnb_core->conf->fwmark);
 
             sockaddr_len = sizeof(struct sockaddr_in6);
             getsockname( gnb_core->udp_ipv6_sockets[i], (struct sockaddr *)&sockaddr6, &sockaddr_len );
@@ -1121,7 +1121,7 @@ static int start(gnb_worker_t *gnb_worker){
 
             gnb_core->udp_ipv4_sockets[i] = socket(AF_INET, SOCK_DGRAM, 0);
 
-            gnb_bind_udp_socket_ipv4(gnb_core->udp_ipv4_sockets[i], gnb_core->conf->listen_address4_string, gnb_core->conf->udp4_ports[i]);
+            gnb_bind_udp_socket_ipv4(gnb_core->udp_ipv4_sockets[i], gnb_core->conf->listen_address4_string, gnb_core->conf->udp4_ports[i], gnb_core->conf->fwmark);
 
             if ( 0==gnb_core->conf->udp4_ports[i] ) {
                 sockaddr_len = sizeof(struct sockaddr_in);
