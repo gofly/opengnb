@@ -46,22 +46,18 @@
 
 static void send_address_to_node(gnb_es_ctx *es_ctx, gnb_node_t *src_node, gnb_node_t *dst_node){
 
-    unsigned char payload_buffer[ PUSH_ADDR_FRAME_PAYLOAD_SIZE ];
+    static unsigned char payload_buffer[ PUSH_ADDR_FRAME_PAYLOAD_SIZE ];
     gnb_payload16_t *payload;
     gnb_ctl_block_t  *ctl_block;
     gnb_log_ctx_t *log;
 
     ctl_block = es_ctx->ctl_block;
-
     log = es_ctx->log;
 
     payload = (gnb_payload16_t *)payload_buffer;
-    memset(payload_buffer, 0, PUSH_ADDR_FRAME_PAYLOAD_SIZE);
 
     payload->type = GNB_PAYLOAD_TYPE_INDEX;
     payload->sub_type = PAYLOAD_SUB_TYPE_PUSH_ADDR;
-
-    gnb_payload16_set_data_len( payload,  sizeof(push_addr_frame_t) );
 
     push_addr_frame_t *push_addr_frame = (push_addr_frame_t *)payload->data;
 
@@ -75,6 +71,8 @@ static void send_address_to_node(gnb_es_ctx *es_ctx, gnb_node_t *src_node, gnb_n
 
     memcpy(&push_addr_frame->data.addr4_a, &src_node->udp_sockaddr4.sin_addr.s_addr, 4);
     push_addr_frame->data.port4_a = src_node->udp_sockaddr4.sin_port;
+
+    gnb_payload16_set_data_len( payload,  sizeof(push_addr_frame_t) );
 
     snprintf(push_addr_frame->data.text,32,"%llu>%llu>%llu", ctl_block->core_zone->local_uuid, src_node->uuid64, dst_node->uuid64);
 
