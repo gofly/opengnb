@@ -1,8 +1,8 @@
 USE_MBEDTLS ?= 1
 
 CFLAGS=-ffunction-sections -fdata-sections -Wno-unused-result -I./src -I./libs -I./libs/miniupnpc -I./libs/libnatpmp -I./libs/zlib -D NO_GZIP=1 -D GNB_OPENWRT_BUILD=1
-CLI_LDFLAGS=-Wl,--gc-sections -L/usr/lib -pthread
-GNB_ES_LDFLAGS=-Wl,--gc-sections -L/usr/lib -pthread
+CLI_LDFLAGS=-Wl,--gc-sections -L/usr/lib -pthread -flto
+GNB_ES_LDFLAGS=-Wl,--gc-sections -L/usr/lib -pthread -flto
 
 ifeq ($(USE_MBEDTLS),1)
 CFLAGS += -DWITH_MBEDTLS=1
@@ -14,6 +14,7 @@ endif
 ifeq ($(DEBUG),1)
 CFLAGS += -g
 else
+CFLAGS += -Os -flto -DNDEBUG
 CLI_LDFLAGS    += -s
 GNB_ES_LDFLAGS += -s
 endif

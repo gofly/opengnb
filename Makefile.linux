@@ -15,7 +15,7 @@ endif
 ifeq ($(DEBUG),1)
 CFLAGS += -g
 else
-CFLAGS += -O2
+CFLAGS += -Os -flto -DNDEBUG
 CLI_LDFLAGS    += -s
 GNB_ES_LDFLAGS += -s
 endif
