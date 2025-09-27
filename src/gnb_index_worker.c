@@ -219,7 +219,7 @@ static void send_detect_addr_frame(gnb_worker_t *gnb_index_worker, gnb_address_t
         }
 
         address_st.port = htons(i);
-        gnb_send_to_address_through_all_sockets(gnb_core, &address_st, index_worker_ctx->index_frame_payload, 1);
+        gnb_send_to_address(gnb_core, &address_st, index_worker_ctx->index_frame_payload);
 
     }
 
@@ -230,7 +230,7 @@ static void send_detect_addr_frame(gnb_worker_t *gnb_index_worker, gnb_address_t
         }
 
         address_st.port = htons(i);
-        gnb_send_to_address_through_all_sockets(gnb_core, &address_st, index_worker_ctx->index_frame_payload, 1);
+        gnb_send_to_address(gnb_core, &address_st, index_worker_ctx->index_frame_payload);
 
     }
 
