@@ -17,6 +17,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "gnb_arg_list.h"
 
@@ -112,110 +113,53 @@ int gnb_arg_list_to_string(gnb_arg_list_t *arg_list, char *string, size_t string
 #define ARG_STRING              1
 
 gnb_arg_list_t *gnb_arg_string_to_list(char *string, int num){
-    
-    int status = ARG_SEPARATOR;
-    
-    int separator = SPACE_SEPARATOR;
-    
-    char *arg;
-    char *arg_p;
-    
-    arg = malloc(GNB_ARG_MAX_SIZE);
-    
-    arg_p = arg;
-    
-    char *p;
-    
-    p = (char *)string;
-    
+
     gnb_arg_list_t *arg_list = gnb_arg_list_init(num);
-    
-    int c = 0;
+    char *p = string;
+    char buffer[GNB_ARG_MAX_SIZE];
+    int buffer_idx = 0;
+    bool in_quotes = false;
+    char quote_char = '\0';
 
     while (*p) {
-        
-        if ( c>=GNB_ARG_STRING_MAX_SIZE ) {
+        if (in_quotes) {
+            if (*p == quote_char) {
+                // 结束引号
+                in_quotes = false;
+                quote_char = '\0';
+            } else {
+                buffer[buffer_idx++] = *p;
+            }
+        } else {
+            if (*p == '\'' || *p == '"') {
+                // 开始引号
+                in_quotes = true;
+                quote_char = *p;
+            } else if (*p == ' ') {
+                // 遇到空格，一个参数结束
+                if (buffer_idx > 0) {
+                    buffer[buffer_idx] = '\0';
+                    gnb_arg_append(arg_list, buffer);
+                    buffer_idx = 0;
+                }
+            } else {
+                // 普通字符
+                buffer[buffer_idx++] = *p;
+            }
+        }
+
+        if (buffer_idx >= GNB_ARG_MAX_SIZE - 1) {
+            // 防止缓冲区溢出
             break;
         }
-        
-        if ( ' ' == *p ) {
-        
-            if ( ARG_STRING == status && SPACE_SEPARATOR == separator ) {
-                
-                *arg_p = '\0';
-                gnb_arg_append(arg_list,arg);
-                arg_p = arg;
-                status = ARG_SEPARATOR;
-                goto next;
-                
-            }
-            
-            if ( ARG_STRING == status && ( SINGLE_QUOTES_SEPARATOR == separator || DOUBLE_QUOTES_SEPARATOR == separator ) ) {
-   
-                *arg_p = *p;
-                arg_p++;
-                status = ARG_SEPARATOR;
-                goto next;
-                
-            }
-            
-        }
-        
-        if ( '\'' == *p ) {
-        
-            if ( SPACE_SEPARATOR == separator ) {
-                separator = SINGLE_QUOTES_SEPARATOR;
-                status = ARG_STRING;
-                goto next;
-            }
-            
-            
-            if ( ARG_STRING == status && SINGLE_QUOTES_SEPARATOR == separator ) {
-                
-                *arg_p = '\0';
-                gnb_arg_append(arg_list,arg);
-                arg_p = arg;
-                
-                separator = SPACE_SEPARATOR;
-                status    = ARG_SEPARATOR;
-                
-                goto next;
-                
-            }
-            
-            
-        }
-        
-        if ( ' ' != *p && SPACE_SEPARATOR == separator ) {
-            
-            status = ARG_STRING;
-            *arg_p = *p;
-            arg_p++;
-            goto next;
-            
-        } else if ( SPACE_SEPARATOR != separator ) {
-        
-            status = ARG_STRING;
-
-            *arg_p = *p;
-            arg_p++;
-            goto next;
-            
-        }
-        
-next:
         p++;
-        c++;
-    
-    };
-    
-    if ( arg_p != arg ) {
-        *arg_p = '\0';
-        gnb_arg_append(arg_list,arg);
     }
-    
-    free(arg);
+
+    // 处理最后一个参数
+    if (buffer_idx > 0) {
+        buffer[buffer_idx] = '\0';
+        gnb_arg_append(arg_list, buffer);
+    }
 
     return arg_list;
-    
 }

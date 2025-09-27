@@ -128,10 +128,8 @@ static void handle_post_addr_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *i
         address4_list->size = GNB_KEY_ADDRESS_NUM;
 
     } else {
-
         address6_list = (gnb_address_list_t *)key_address->address6_list_block;
         address4_list = (gnb_address_list_t *)key_address->address4_list_block;
-
     }
 
     key_address->uuid64 = gnb_ntohll(post_addr_frame->data.src_uuid64);

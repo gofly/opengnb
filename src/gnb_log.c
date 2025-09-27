@@ -278,12 +278,15 @@ int gnb_log_file_rotate(gnb_log_ctx_t *log) {
     char archive_name[PATH_MAX+NAME_MAX];
     int mday = gnb_now_mday();
     if (mday == log->pre_mday) {
-        close_log_file_pre_fd(log);
         return 0;
     }
     if ( !(log->output_type & GNB_LOG_OUTPUT_FILE) ) {
         return 1;
     }
+
+    // 在重命名文件之前，关闭上一轮保存的旧文件描述符
+    close_log_file_pre_fd(log);
+
     log->pre_mday = mday;
     gnb_now_timef("%Y_%m_%d",now_time_string,GNB_TIME_STRING_MAX);
     snprintf(archive_name, PATH_MAX+NAME_MAX, "%s/std_%s.log.arc", log->log_file_path, now_time_string);

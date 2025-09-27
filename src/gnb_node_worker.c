@@ -225,6 +225,8 @@ static void unifield_forwarding_notify(gnb_core_t *gnb_core, gnb_node_t *dst_nod
 
 static void send_ping_frame(gnb_core_t *gnb_core, gnb_node_t *node){
 
+    unsigned char addr_type_bits = 0;
+
     int ret;
 
     gnb_worker_t *primary_worker = gnb_core->primary_worker;
@@ -232,7 +234,15 @@ static void send_ping_frame(gnb_core_t *gnb_core, gnb_node_t *node){
     node_worker_ctx_t *node_worker_ctx = gnb_core->node_worker->ctx;
 
     if ( INADDR_ANY == node->udp_sockaddr4.sin_addr.s_addr && 0 == memcmp(&node->udp_sockaddr6.sin6_addr,&in6addr_any,sizeof(struct in6_addr)) ) {
-        return;
+        return; // 如果 IPv4 和 IPv6 地址都无效，则不发送
+    }
+
+    // 确定要向哪些有效地址发送 PING
+    if (INADDR_ANY != node->udp_sockaddr4.sin_addr.s_addr) {
+        addr_type_bits |= GNB_ADDR_TYPE_IPV4;
+    }
+    if (0 != memcmp(&node->udp_sockaddr6.sin6_addr, &in6addr_any, sizeof(struct in6_addr))) {
+        addr_type_bits |= GNB_ADDR_TYPE_IPV6;
     }
 
     if ( GNB_NODE_STATUS_UNREACHABL == node->udp_addr_status ) {
@@ -258,8 +268,8 @@ static void send_ping_frame(gnb_core_t *gnb_core, gnb_node_t *node){
         ed25519_sign(node_ping_frame->src_sign, (const unsigned char *)&node_ping_frame->data, sizeof(struct ping_frame_data), gnb_core->ed25519_public_key, gnb_core->ed25519_private_key);
     }
 
-    //PING frame 尽可能 ipv4 和 ipv6 都发送
-    gnb_send_to_node(gnb_core, node, node_worker_ctx->node_frame_payload, GNB_ADDR_TYPE_IPV6|GNB_ADDR_TYPE_IPV4);
+    // 只向有效的地址发送 PING
+    gnb_send_to_node(gnb_core, node, node_worker_ctx->node_frame_payload, addr_type_bits);
 
     //更新 node 的ping 时间戳
     node->ping_ts_sec  = node_worker_ctx->now_time_sec;
@@ -375,19 +385,40 @@ static void handle_ping_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *node_w
         //处理来自 LAN 的 ping frame
         if ( PAYLOAD_SUB_TYPE_LAN_PING == node_worker_in_data->payload_st.sub_type ) {
 
-            src_node->udp_sockaddr4 = node_addr->addr.in;
-            //LAN ping 的端口存放在 attachment 中
-            memcpy(&src_node->udp_sockaddr4.sin_port, node_ping_frame->data.attachment, sizeof(uint16_t));
+            /* attachment 应至少包含一个 uint16_t（端口），这里先做简单检查 */
+            // 如果你有 payload 长度查询函数，建议在此验证 attachment 长度
+            // e.g. if (gnb_payload16_get_data_len(&node_worker_in_data->payload_st) < expected) { log; return; }
 
-            src_node->socket4_idx   = node_worker_in_data->socket_idx;
-            addr_update = 1;
+            uint16_t tun_port_net = 0;
+            memcpy(&tun_port_net, node_ping_frame->data.attachment, sizeof(uint16_t)); // 假定 attachment 为网络字节序
 
-            GNB_LOG3(gnb_core->log, GNB_LOG_ID_NODE_WORKER, "handle_ping_frame IPV4 LAN src[%llu]->dst[%llu] idx=%u %s now=%"PRIu64" src_ts=%"PRIu64" up=%u different=%"PRId64"\n",
+            /* 不要修改 src_node->udp_sockaddr4.sin_addr（那是接收到的 LAN IP），
+            仅更新端口（如果与已记录的端口不同） */
+            if ( src_node->udp_sockaddr4.sin_port != tun_port_net ) {
+                src_node->udp_sockaddr4.sin_port = tun_port_net;
+                addr_update = 1;
+            }
+
+            /* 更新 socket index 如果发生变化也算 addr_update */
+            if ( src_node->socket4_idx != node_worker_in_data->socket_idx ) {
+                src_node->socket4_idx = node_worker_in_data->socket_idx;
+                addr_update = 1;
+            }
+
+            /* 注意：如果你的协议约定 attachment 中端口是主机序而非网络序，这里需要用 htons/ntohs 处理 */
+            /* 例如，如果 attachment 是主机序，则：
+                uint16_t port_host;
+                memcpy(&port_host, node_ping_frame->data.attachment, sizeof(uint16_t));
+                uint16_t tun_port_net = htons(port_host);
+            并把 tun_port_net 存入 sockaddr.sin_port
+            */
+
+            GNB_LOG3(gnb_core->log, GNB_LOG_ID_NODE_WORKER,
+                    "handle_ping_frame IPV4 LAN src[%llu]->dst[%llu] idx=%u port=%u now=%"PRIu64" src_ts=%"PRIu64" up=%u different=%"PRId64"\n",
                     src_node->uuid64, dst_uuid64,
                     node_worker_in_data->socket_idx,
-                    GNB_SOCKADDR4STR1(&src_node->udp_sockaddr4),
+                    (unsigned int)ntohs(src_node->udp_sockaddr4.sin_port),
                     node_worker_ctx->now_time_usec, src_ts_usec, addr_update, latency_usec);
-
         }
 
         src_node->udp_addr_status |= GNB_NODE_STATUS_IPV4_PING;
@@ -430,19 +461,8 @@ static void handle_ping_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *node_w
         ed25519_sign(node_pong_frame->src_sign, (const unsigned char *)&node_pong_frame->data, sizeof(struct pong_frame_data), gnb_core->ed25519_public_key, gnb_core->ed25519_private_key);
     }
 
-    unsigned char addr_type_bits;
-
-    //根据源地址选择发送的类型
-    if ( AF_INET == node_addr->addr_type ) {
-        addr_type_bits = GNB_ADDR_TYPE_IPV4;
-    }
-
-    if ( AF_INET6 == node_addr->addr_type ) {
-        addr_type_bits = GNB_ADDR_TYPE_IPV6;
-    }
-
-    gnb_send_to_node(gnb_core, src_node, node_worker_ctx->node_frame_payload, addr_type_bits);
-
+    // 不论 PING 从哪个地址来，都向节点的 IPv4 和 IPv6 地址发送 PONG，以尝试建立双向连接
+    gnb_send_to_node(gnb_core, src_node, node_worker_ctx->node_frame_payload, GNB_ADDR_TYPE_IPV4 | GNB_ADDR_TYPE_IPV6);
 }
 
 
@@ -497,8 +517,8 @@ static void handle_pong_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *node_w
         address_st.latency_usec = 1;
     }
 
-    if ( AF_INET6 == node_addr->addr_type ) {
-
+    switch ( node_addr->addr_type ) {
+    case AF_INET6:
         if ( 0 != gnb_determine_subnet6_prefixlen96(node_addr->addr.in6.sin6_addr, gnb_core->local_node->tun_ipv6_addr ) ) {
 
             GNB_LOG3(gnb_core->log, GNB_LOG_ID_NODE_WORKER, "handle_pong_frame IPV6 Warning src[%llu]->dst[%llu] idx=%u %s\n",
@@ -543,11 +563,8 @@ static void handle_pong_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *node_w
                 GNB_SOCKADDR6STR1(&src_node->udp_sockaddr6),
                 node_worker_ctx->now_time_usec, dst_ts_usec, addr_update, src_node->addr6_ping_latency_usec);
 
-
-    }
-
-    if ( AF_INET == node_addr->addr_type ) {
-
+        break;
+    case AF_INET:
         if ( 0 != gnb_determine_subnet4(node_addr->addr.in.sin_addr,  gnb_core->local_node->tun_addr4, gnb_core->local_node->tun_netmask_addr4) ) {
 
             GNB_LOG3(gnb_core->log, GNB_LOG_ID_NODE_WORKER, "handle_pong_frame IPV4 Warning src[%llu]->dst[%llu] idx=%u %s\n",
@@ -591,7 +608,7 @@ static void handle_pong_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *node_w
                 node_worker_in_data->socket_idx,
                 GNB_SOCKADDR4STR1(&src_node->udp_sockaddr4),
                 node_worker_ctx->now_time_usec, dst_ts_usec, addr_update, src_node->addr4_ping_latency_usec);
-
+        break;
     }
 
     //处理附件
@@ -605,6 +622,16 @@ static void handle_pong_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *node_w
 
         if ( src_node->tun_sin_port4 != attachment_tun_sockaddress->tun_sin_port4 ) {
             src_node->tun_sin_port4 = attachment_tun_sockaddress->tun_sin_port4;
+        }
+
+        // 补充对 tun_addr4 的处理
+        if (src_node->tun_addr4.s_addr != attachment_tun_sockaddress->tun_addr4.s_addr) {
+            src_node->tun_addr4 = attachment_tun_sockaddress->tun_addr4;
+        }
+
+        // 补充对 IPv6 TUN 地址和端口的处理
+        if (memcmp(&src_node->tun_ipv6_addr, &attachment_tun_sockaddress->tun_ipv6_addr, sizeof(struct in6_addr)) != 0) {
+            src_node->tun_ipv6_addr = attachment_tun_sockaddress->tun_ipv6_addr;
         }
 
     }
@@ -636,7 +663,7 @@ static void handle_pong_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *node_w
     gnb_payload16_set_data_len(payload_attachment2, 0);
     payload_attachment2->type = GNB_NODE_ATTACHMENT_TYPE_TUN_EMPTY;
 
-    snprintf((char *)node_pong2_frame->data.text,32,"%llu --PONG2-> %llu",gnb_core->local_node->uuid64,src_node->uuid64);
+    snprintf((char *)node_pong2_frame->data.text,32,"%llu --PONG2-> %llu",gnb_core->local_node->uuid64, src_node->uuid64);
 
     if ( 0 == gnb_core->conf->lite_mode ) {
         ed25519_sign(node_pong2_frame->src_sign, (const unsigned char *)&node_pong2_frame->data, sizeof(struct pong_frame_data), gnb_core->ed25519_public_key, gnb_core->ed25519_private_key);
@@ -696,10 +723,14 @@ static void sync_node(gnb_worker_t *gnb_node_worker){
             gnb_core->index_address_ring.address_list->num > 0 )
         {
 
-            if ( (node_worker_ctx->now_time_sec - node->ping_ts_sec) >= GNB_NODE_PING_INTERVAL_SEC ) {
+            if ( (node_worker_ctx->now_time_sec - node->ping_ts_sec) >= GNB_NODE_PING_INTERVAL_SEC && gnb_core->index_worker && gnb_core->index_worker->send_request_addr_frame_func ) {
                 //如果地址为 0.0.0.0 或 :: , 需要向 index node 发送 PAYLOAD_SUB_TYPE_ADDR_QUERY
+                if (gnb_core->index_worker && gnb_core->index_worker->send_request_addr_frame_func) {
+                    gnb_core->index_worker->send_request_addr_frame_func(gnb_core->index_worker, node);
+                }
                 node->udp_addr_status = GNB_NODE_STATUS_UNREACHABL;
                 node->ping_ts_sec = node_worker_ctx->now_time_sec;
+
             }
 
             continue;
@@ -876,9 +907,16 @@ static void init(gnb_worker_t *gnb_worker, void *ctx){
 
 
 static void release(gnb_worker_t *gnb_worker){
-
-    node_worker_ctx_t *node_worker_ctx =  (node_worker_ctx_t *)gnb_worker->ctx;
-
+    node_worker_ctx_t *node_worker_ctx = (node_worker_ctx_t *)gnb_worker->ctx;
+    if (!node_worker_ctx) return;
+    if (node_worker_ctx->node_frame_payload) {
+        gnb_heap_free(node_worker_ctx->gnb_core->heap, node_worker_ctx->node_frame_payload);
+        node_worker_ctx->node_frame_payload = NULL;
+    }
+    // 如果 ring buffer memory 在 init 分配了独立 pointer，也要 free
+    // 最后 free node_worker_ctx 自身
+    gnb_heap_free(node_worker_ctx->gnb_core->heap, node_worker_ctx);
+    gnb_worker->ctx = NULL;
 }
 
 
@@ -886,24 +924,33 @@ static int start(gnb_worker_t *gnb_worker){
 
     node_worker_ctx_t *node_worker_ctx = gnb_worker->ctx;
 
-    pthread_create(&node_worker_ctx->thread_worker, NULL, thread_worker_func, gnb_worker);
-
-    pthread_detach(node_worker_ctx->thread_worker);
-
+    int rc = pthread_create(&node_worker_ctx->thread_worker, NULL, thread_worker_func, gnb_worker);
+    if (rc != 0) {
+        GNB_LOG2(node_worker_ctx->gnb_core->log, GNB_LOG_ID_NODE_WORKER, "pthread_create failed: %d\n", rc);
+        return -1;
+    }
+    rc = pthread_detach(node_worker_ctx->thread_worker);
+    if (rc != 0) {
+        GNB_LOG2(node_worker_ctx->gnb_core->log, GNB_LOG_ID_NODE_WORKER, "pthread_detach failed: %d\n", rc);
+        return -1;
+    }
     return 0;
 }
 
-
-static int stop(gnb_worker_t *gnb_worker){
-
+int stop(gnb_worker_t *gnb_worker){
     node_worker_ctx_t *node_worker_ctx = gnb_worker->ctx;
-
     gnb_core_t *gnb_core = node_worker_ctx->gnb_core;
 
-    gnb_worker_t *node_worker = gnb_core->node_worker;
+    gnb_worker->thread_worker_flag = 0;
 
-    node_worker->thread_worker_flag = 0;
-
+    // 等待最多 5s
+    int wait = 0;
+    while (gnb_worker->thread_worker_run_flag && wait++ < 5000) {
+        usleep(1000);
+    }
+    if (gnb_worker->thread_worker_run_flag) {
+        GNB_LOG2(gnb_core->log, GNB_LOG_ID_NODE_WORKER, "node worker thread did not exit\n");
+    }
     return 0;
 }
 
