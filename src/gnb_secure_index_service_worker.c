@@ -158,9 +158,11 @@ static void handle_post_addr_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *i
 
     }
 
+    // 确保无论是新条目还是旧条目，UUID都被更新
     key_address->uuid64 = gnb_ntohll(post_addr_frame->data.src_uuid64);
 
-    gnb_address_t *address = alloca(sizeof(gnb_address_t));
+    gnb_address_t address_st;
+    gnb_address_t *address = &address_st;
     address->ts_sec = index_service_worker_ctx->now_time_sec;
 
     if ( AF_INET6 == sockaddress->addr_type ) {

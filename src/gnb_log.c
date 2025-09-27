@@ -415,13 +415,15 @@ int gnb_log_file_rotate(gnb_log_ctx_t *log){
     int mday = gnb_now_mday();
 
     if (mday == log->pre_mday) {
-        close_log_file_pre_fd(log);
         return 0;
     }
 
     if ( !(log->output_type & GNB_LOG_OUTPUT_FILE) ) {
         return 1;
     }
+
+    // 在重命名文件之前，关闭上一轮保存的旧文件描述符
+    close_log_file_pre_fd(log);
 
     log->pre_mday = mday;
 

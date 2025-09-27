@@ -46,17 +46,20 @@ void gnb_setup_unified_forwarding_nodeid(gnb_core_t *gnb_core, gnb_node_t *dst_n
 
     int select_idx = 0;
 
-    if ( 0 != dst_node->unified_forwarding_nodeid && (gnb_core->now_time_sec - dst_node->unified_forwarding_node_ts_sec) > GNB_UNIFIED_FORWARDING_NODE_EXPIRED_SEC ) {
+    // 如果已缓存的转发节点ID有效且未过期，则直接使用，无需重新选择
+    if ( 0 != dst_node->unified_forwarding_nodeid && (gnb_core->now_time_sec - dst_node->unified_forwarding_node_ts_sec) < GNB_UNIFIED_FORWARDING_NODE_EXPIRED_SEC ) {
         return;
     }
 
     for ( i=1; i<GNB_UNIFIED_FORWARDING_NODE_ARRAY_SIZE; i++ ) {
 
+        // 跳过已过期的条目
         if ( (gnb_core->now_time_sec - dst_node->unified_forwarding_node_array[i].last_ts_sec) > GNB_UNIFIED_FORWARDING_NODE_ARRAY_EXPIRED_SEC ) {
             continue;
         }
 
-        if ( dst_node->unified_forwarding_node_array[select_idx].last_ts_sec > dst_node->unified_forwarding_node_array[i].last_ts_sec ) {
+        // 选择时间戳最大（即最新）的节点
+        if ( dst_node->unified_forwarding_node_array[i].last_ts_sec > dst_node->unified_forwarding_node_array[select_idx].last_ts_sec ) {
             select_idx = i;
         }
 
@@ -185,6 +188,11 @@ int gnb_unified_forwarding_with_multi_path_tun(gnb_core_t *gnb_core, gnb_pf_ctx_
     for ( i=0; i<GNB_UNIFIED_FORWARDING_NODE_ARRAY_SIZE; i++ ) {
 
         if ( (gnb_core->now_time_sec - dst_node->unified_forwarding_node_array[i].last_ts_sec) > GNB_UNIFIED_FORWARDING_NODE_ARRAY_EXPIRED_SEC ) {
+            continue;
+        }
+
+        // 避免重复发送给目标节点
+        if (dst_node->unified_forwarding_node_array[i].uuid64 == dst_node->uuid64) {
             continue;
         }
 

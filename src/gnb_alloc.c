@@ -143,6 +143,9 @@ finish:
 
     gnb_heap->fragment_nums--;
 
+    // 清理悬挂指针，防止在后续操作中被错误地访问
+    gnb_heap->fragment_list[gnb_heap->fragment_nums] = NULL;
+
     free(fragment);
 
 }
