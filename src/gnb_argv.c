@@ -1128,6 +1128,7 @@ static void show_useage(int argc,char *argv[]){
 
 #if defined(__linux__)
     printf("      --systemd                     systemd daemon\n");
+    printf("      --fwmark                      outbound fwmark\n");
 #endif
     
     printf("      --node-worker-queue           node  worker queue length\n");

@@ -59,23 +59,19 @@ static int pf_tun_route_cb(gnb_core_t *gnb_core, gnb_pf_t *pf, gnb_pf_ctx_t *pf_
         return GNB_PF_ERROR;
     }
 
+    uint64_t *p64 = (uint64_t *)pf_ctx->ip_frame;
+    uint64_t *key64 = (uint64_t *)pf_ctx->dst_node->crypto_key;
+    int n = pf_ctx->ip_frame_size / 8;
     int i;
-    int j = 0;
 
-    unsigned char *p = (unsigned char *)pf_ctx->ip_frame;
+    for (i = 0; i < n; i++) {
+        p64[i] ^= key64[i % 8];
+    }
 
-    for ( i=0; i<pf_ctx->ip_frame_size; i++ ) {
-
-        *p = *p ^ pf_ctx->dst_node->crypto_key[j];
-
-        p++;
-
-        j++;
-
-        if ( j >= 64 ) {
-            j = 0;
-        }
-
+    // 处理剩余的字节
+    unsigned char *p8 = (unsigned char *)(p64 + n);
+    for (i = n * 8; i < pf_ctx->ip_frame_size; i++) {
+        *p8++ ^= pf_ctx->dst_node->crypto_key[i % 64];
     }
 
     return pf_ctx->pf_status;;
@@ -95,10 +91,6 @@ static int pf_inet_route_cb(gnb_core_t *gnb_core, gnb_pf_t *pf, gnb_pf_ctx_t *pf
 
     gnb_node_t *src_node;
 
-    int i;
-    int j = 0;
-    unsigned char *p = (unsigned char *)pf_ctx->ip_frame;
-
     if ( GNB_PF_FWD_TUN==pf_ctx->pf_fwd ) {
 
         src_node = pf_ctx->src_node;
@@ -107,23 +99,40 @@ static int pf_inet_route_cb(gnb_core_t *gnb_core, gnb_pf_t *pf, gnb_pf_ctx_t *pf
             return GNB_PF_ERROR;
         }
 
-        for ( i=0; i<pf_ctx->ip_frame_size; i++ ) {
+        uint64_t *p64 = (uint64_t *)pf_ctx->ip_frame;
+        uint64_t *key64 = (uint64_t *)src_node->crypto_key;
+        int n = pf_ctx->ip_frame_size / 8;
+        int i;
 
-            *p = *p ^ src_node->crypto_key[j];
-
-            p++;
-            j++;
-
-            if ( j >= 64 ) {
-                j = 0;
-            }
-
+        for (i = 0; i < n; i++) {
+            p64[i] ^= key64[i % 8];
+        }
+        unsigned char *p8 = (unsigned char *)(p64 + n);
+        for (i = n * 8; i < pf_ctx->ip_frame_size; i++) {
+            *p8++ ^= src_node->crypto_key[i % 64];
         }
 
     }
 
     return pf_ctx->pf_status;
 
+}
+
+static inline void xor_crypt_relay_payload(unsigned char *data, int data_len, const unsigned char *key) {
+    uint64_t *p64 = (uint64_t *)data;
+    const uint64_t *key64 = (const uint64_t *)key;
+    int n = data_len / 8;
+    int i;
+
+    for (i = 0; i < n; i++) {
+        p64[i] ^= key64[i % 8];
+    }
+
+    // 处理剩余的字节
+    unsigned char *p8 = (unsigned char *)(p64 + n);
+    for (i = n * 8; i < data_len; i++) {
+        *p8++ ^= key[i % 64];
+    }
 }
 
 
@@ -136,12 +145,6 @@ static int pf_chain_relay_cb(gnb_core_t *gnb_core, gnb_pf_t *pf, gnb_pf_ctx_t *p
     gnb_pf_private_ctx_t *ctx = (gnb_pf_private_ctx_t *)pf->private_ctx;
     ctx->save_time_seed_update_factor = gnb_core->time_seed_update_factor;
 
-    int i;
-
-    int j = 0;
-
-    unsigned char *p;
-
     if ( !(pf_ctx->fwd_payload->sub_type & GNB_PAYLOAD_SUB_TYPE_IPFRAME_RELAY) ) {
         return pf_ctx->pf_status;
     }
@@ -153,21 +156,8 @@ static int pf_chain_relay_cb(gnb_core_t *gnb_core, gnb_pf_t *pf, gnb_pf_ctx_t *p
             goto finish;
         }
 
-        p = (unsigned char *)pf_ctx->fwd_payload->data;
-
-        for ( i=0; i < (gnb_payload16_data_len(pf_ctx->fwd_payload)-sizeof(gnb_uuid_t)); i++ ) {
-
-            *p = *p ^ pf_ctx->fwd_node->crypto_key[j];
-
-            p++;
-
-            j++;
-
-            if ( j >= 64 ) {
-                j = 0;
-            }
-
-        }
+        int data_len = gnb_payload16_data_len(pf_ctx->fwd_payload) - sizeof(gnb_uuid_t);
+        xor_crypt_relay_payload(pf_ctx->fwd_payload->data, data_len, pf_ctx->fwd_node->crypto_key);
 
         pf_ctx->pf_status = GNB_PF_NEXT;
 
@@ -211,25 +201,8 @@ static int pf_inet_frame_cb(gnb_core_t *gnb_core, gnb_pf_t *pf, gnb_pf_ctx_t *pf
         goto finish;
     }
 
-    int i;
-    int j = 0;
-
-    unsigned char *p;
-
-    p = (unsigned char *)pf_ctx->fwd_payload->data;
-
-    for ( i=0; i < (gnb_payload16_data_len(pf_ctx->fwd_payload)-sizeof(gnb_uuid_t)); i++ ) {
-        *p = *p ^ pf_ctx->src_fwd_node->crypto_key[j];
-
-        p++;
-
-        j++;
-
-        if ( j >= 64 ) {
-            j = 0;
-        }
-
-    }
+    int data_len = gnb_payload16_data_len(pf_ctx->fwd_payload) - sizeof(gnb_uuid_t);
+    xor_crypt_relay_payload(pf_ctx->fwd_payload->data, data_len, pf_ctx->src_fwd_node->crypto_key);
 
     goto finish;
 
