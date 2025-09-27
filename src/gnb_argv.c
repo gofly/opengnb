@@ -33,6 +33,8 @@ extern gnb_conf_ext_lite_t gnb_conf_ext_lite;
 
 void show_description();
 
+#define GNB_DEFAULT_LISTEN_PORT 9001
+
 static void show_useage(int argc,char *argv[]);
 
 int check_listen_string(char *listen_string);
@@ -992,15 +994,15 @@ gnb_conf_t* gnb_argv(int argc,char *argv[]){
     if ( '\0' != listen_sockaddress6_string[0] ) {
         gnb_setup_listen_addr_port(conf->listen_address6_string, &conf->udp6_ports[0], listen_sockaddress6_string, AF_INET6);
     } else {
-        strncpy(conf->listen_address6_string,"::", sizeof("::")-1);
-        conf->udp6_ports[0] = 9001;
+        strncpy(conf->listen_address6_string, "::", sizeof("::")-1);
+        conf->udp6_ports[0] = GNB_DEFAULT_LISTEN_PORT;
     }
 
     if ( '\0' != listen_sockaddress4_string[0] ) {
         gnb_setup_listen_addr_port(conf->listen_address4_string, &conf->udp4_ports[0], listen_sockaddress4_string, AF_INET);
     } else {
-        strncpy(conf->listen_address4_string,"0.0.0.0", sizeof("0.0.0.0")-1);
-        conf->udp4_ports[0] = 9001;
+        strncpy(conf->listen_address4_string, "0.0.0.0", sizeof("0.0.0.0")-1);
+        conf->udp4_ports[0] = GNB_DEFAULT_LISTEN_PORT;
     }
 
     if ( '\0' == conf->conf_dir[0] ) {
@@ -1118,7 +1120,7 @@ static void show_useage(int argc,char *argv[]){
     printf("  -U, --unified-forwarding          \"off\",\"force\",\"auto\",\"super\",\"hyper\" default:\"auto\"; cannot be used with --pf-worker\n");
 
 
-    printf("  -l, --listen                      listen address default:\"0.0.0.0:9001\"\n");
+    printf("  -l, --listen                      listen address default:\"0.0.0.0:%d\"\n", GNB_DEFAULT_LISTEN_PORT);
     printf("  -b, --ctl-block                   ctl block mapper file\n");
     printf("  -e, --es-argv                     pass-through gnb_es argv\n");
     printf("  -V, --verbose                     verbose mode\n");

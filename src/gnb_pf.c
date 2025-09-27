@@ -513,7 +513,9 @@ void gnb_pf_tun(gnb_core_t *gnb_core, gnb_pf_core_t *pf_core, gnb_payload16_t *p
             pf_ctx_st.unified_forwarding = 0;
         }
 
-        goto pf_tun_finish;
+        if (pf_ctx_st.unified_forwarding) {
+            goto pf_tun_finish;
+        }
 
     }
 
@@ -529,7 +531,9 @@ void gnb_pf_tun(gnb_core_t *gnb_core, gnb_pf_core_t *pf_core, gnb_payload16_t *p
             pf_ctx_st.unified_forwarding = 0;
         }
 
-        goto pf_tun_finish;
+        if (pf_ctx_st.unified_forwarding) {
+            goto pf_tun_finish;
+        }
 
     }
 
@@ -545,7 +549,9 @@ void gnb_pf_tun(gnb_core_t *gnb_core, gnb_pf_core_t *pf_core, gnb_payload16_t *p
             pf_ctx_st.unified_forwarding = 0;
         }
 
-        goto pf_tun_finish;
+        if (pf_ctx_st.unified_forwarding) {
+            goto pf_tun_finish;
+        }
 
     }
 

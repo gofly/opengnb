@@ -313,8 +313,15 @@ static void init(gnb_worker_t *gnb_worker, void *ctx){
 
 static void release(gnb_worker_t *gnb_worker){
 
-    detect_worker_ctx_t *detect_worker_ctx =  (detect_worker_ctx_t *)gnb_worker->ctx;
+    if (!gnb_worker || !gnb_worker->ctx) {
+        return;
+    }
+    detect_worker_ctx_t *detect_worker_ctx = (detect_worker_ctx_t *)gnb_worker->ctx;
     gnb_core_t *gnb_core = detect_worker_ctx->gnb_core;
+
+    gnb_heap_free(gnb_core->heap, detect_worker_ctx->index_frame_payload);
+    gnb_heap_free(gnb_core->heap, detect_worker_ctx);
+    gnb_worker->ctx = NULL;
 
 }
 

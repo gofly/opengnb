@@ -813,6 +813,8 @@ static void init(gnb_worker_t *gnb_worker, void *ctx){
     gnb_worker->ring_buffer_out = NULL;
     gnb_worker->ctx = index_worker_ctx;
 
+    gnb_worker->send_request_addr_frame_func = send_request_addr_frame;
+
     GNB_LOG1(gnb_core->log, GNB_LOG_ID_INDEX_WORKER, "%s in ring buffer size = %d\n", gnb_worker->name, gnb_core->conf->index_woker_queue_length);
     GNB_LOG1(gnb_core->log, GNB_LOG_ID_INDEX_WORKER, "%s init finish\n", gnb_worker->name);
 

@@ -191,6 +191,9 @@ static void init(gnb_worker_t *gnb_worker, void *ctx){
         pf = (gnb_pf_t *)gnb_heap_alloc(gnb_core->heap, sizeof(gnb_pf_t));
         *pf = *find_pf;
         gnb_pf_install(pf_core->pf_install_array, pf);
+        if (pf->pf_init) {
+            pf->pf_init(gnb_core, pf);
+        }
     }
 
     find_pf = gnb_find_pf_mod_by_name(gnb_core->conf->pf_route);
@@ -203,12 +206,18 @@ static void init(gnb_worker_t *gnb_worker, void *ctx){
     pf = (gnb_pf_t *)gnb_heap_alloc(gnb_core->heap, sizeof(gnb_pf_t));
     *pf = *find_pf;
     gnb_pf_install(pf_core->pf_install_array, pf);
+    if (pf->pf_init) {
+        pf->pf_init(gnb_core, pf);
+    }
 
     if ( 0 != gnb_core->conf->zip_level ) {
         find_pf = gnb_find_pf_mod_by_name("gnb_pf_zip");
         pf = (gnb_pf_t *)gnb_heap_alloc(gnb_core->heap, sizeof(gnb_pf_t));
         *pf = *find_pf;
         gnb_pf_install(pf_core->pf_install_array, pf);        
+    }
+    if (pf->pf_init) {
+        pf->pf_init(gnb_core, pf);
     }
 
     if ( !(GNB_PF_BITS_CRYPTO_XOR & gnb_core->conf->pf_bits) && !(GNB_PF_BITS_CRYPTO_ARC4 & gnb_core->conf->pf_bits) ) {
@@ -220,6 +229,9 @@ static void init(gnb_worker_t *gnb_worker, void *ctx){
         pf = (gnb_pf_t *)gnb_heap_alloc(gnb_core->heap, sizeof(gnb_pf_t));
         *pf = *find_pf;
         gnb_pf_install(pf_worker_ctx->pf_core->pf_install_array, pf);
+        if (pf->pf_init) {
+            pf->pf_init(gnb_core, pf);
+        }
     }
 
     if ( gnb_core->conf->pf_bits & GNB_PF_BITS_CRYPTO_ARC4 ) {
@@ -227,14 +239,14 @@ static void init(gnb_worker_t *gnb_worker, void *ctx){
         pf = (gnb_pf_t *)gnb_heap_alloc(gnb_core->heap, sizeof(gnb_pf_t));
         *pf = *find_pf;
         gnb_pf_install(pf_core->pf_install_array, pf);
+        if (pf->pf_init) {
+            pf->pf_init(gnb_core, pf);
+        }
     }
 
 skip_crypto:
 
-    gnb_pf_init(gnb_core, pf_core->pf_install_array);
-
     gnb_pf_core_conf(gnb_core, pf_core);
-    gnb_pf_init(gnb_core, pf_core->pf_install_array);
     gnb_pf_conf(gnb_core, pf_core->pf_install_array);
 
     p = gnb_worker->name;

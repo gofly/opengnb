@@ -96,16 +96,19 @@ static void send_post_addr_frame(gnb_worker_t *gnb_index_worker){
 
     post_addr_frame->node_uuid64 = post_addr_frame->data.src_uuid64;
 
-    memcpy(index_worker_ctx->payload_buffer, (const unsigned char *)&post_addr_frame->data, sizeof(struct post_addr_frame_data));
+    // Prepare a temporary payload in payload_buffer
+    gnb_payload16_t *tmp_payload = (gnb_payload16_t *)index_worker_ctx->payload_buffer;
+    tmp_payload->type = index_worker_ctx->index_frame_payload->type;
+    tmp_payload->sub_type = index_worker_ctx->index_frame_payload->sub_type;
+    gnb_payload16_set_data_len(tmp_payload, sizeof(post_addr_frame_t));
+    post_addr_frame_t *tmp_post_frame = (post_addr_frame_t *)tmp_payload->data;
 
     for ( i=0; i<gnb_core->index_node_ring.num; i++ ) {
 
-printf( "SSSSSSS node=%llu [%s]\n", gnb_core->index_node_ring.nodes[i]->uuid64, GNB_HEX1_BYTE32(gnb_core->index_node_ring.nodes[i]->crypto_key));
-
-
-        xor_crypto_copy(gnb_core->index_node_ring.nodes[i]->crypto_key, (unsigned char *)&post_addr_frame->data, index_worker_ctx->payload_buffer, sizeof(struct post_addr_frame_data));
-        ed25519_sign(post_addr_frame->src_sign, (const unsigned char *)&post_addr_frame->data, sizeof(struct post_addr_frame_data), gnb_core->ed25519_public_key, gnb_core->ed25519_private_key);
-        gnb_send_to_node(gnb_core, gnb_core->index_node_ring.nodes[i], index_worker_ctx->index_frame_payload, GNB_ADDR_TYPE_IPV6|GNB_ADDR_TYPE_IPV4);
+        // Encrypt the original plaintext data into the temporary frame's data section
+        xor_crypto_copy(gnb_core->index_node_ring.nodes[i]->crypto_key, (unsigned char *)&tmp_post_frame->data, (unsigned char *)&post_addr_frame->data, sizeof(struct post_addr_frame_data));
+        ed25519_sign(tmp_post_frame->src_sign, (const unsigned char *)&tmp_post_frame->data, sizeof(struct post_addr_frame_data), gnb_core->ed25519_public_key, gnb_core->ed25519_private_key);
+        gnb_send_to_node(gnb_core, gnb_core->index_node_ring.nodes[i], tmp_payload, GNB_ADDR_TYPE_IPV6|GNB_ADDR_TYPE_IPV4);
     }
 
     index_worker_ctx->last_post_addr_ts_sec = index_worker_ctx->now_time_sec;
@@ -164,12 +167,18 @@ static void send_request_addr_frame(gnb_worker_t *gnb_index_worker, gnb_node_t *
 
     } else {
 
-        memcpy(index_worker_ctx->payload_buffer, (const unsigned char *)&request_addr_frame->data, sizeof(struct request_addr_frame_data));
+        // Prepare a temporary payload in payload_buffer
+        gnb_payload16_t *tmp_payload = (gnb_payload16_t *)index_worker_ctx->payload_buffer;
+        tmp_payload->type = index_worker_ctx->index_frame_payload->type;
+        tmp_payload->sub_type = index_worker_ctx->index_frame_payload->sub_type;
+        gnb_payload16_set_data_len(tmp_payload, sizeof(request_addr_frame_t));
+        request_addr_frame_t *tmp_req_frame = (request_addr_frame_t *)tmp_payload->data;
 
         for ( i=0; i<gnb_core->index_node_ring.num; i++ ) {
-            xor_crypto_copy(gnb_core->index_node_ring.nodes[i]->crypto_key, (unsigned char *)&request_addr_frame->data, index_worker_ctx->payload_buffer, sizeof(struct request_addr_frame_data));            
-            ed25519_sign(request_addr_frame->src_sign, (const unsigned char *)&request_addr_frame->data, sizeof(struct request_addr_frame_data), gnb_core->ed25519_public_key, gnb_core->ed25519_private_key);
-            gnb_send_to_node(gnb_core, gnb_core->index_node_ring.nodes[i], index_worker_ctx->index_frame_payload, GNB_ADDR_TYPE_IPV6|GNB_ADDR_TYPE_IPV4);
+            // Encrypt the original plaintext data into the temporary frame's data section
+            xor_crypto_copy(gnb_core->index_node_ring.nodes[i]->crypto_key, (unsigned char *)&tmp_req_frame->data, (unsigned char *)&request_addr_frame->data, sizeof(struct request_addr_frame_data));
+            ed25519_sign(tmp_req_frame->src_sign, (const unsigned char *)&tmp_req_frame->data, sizeof(struct request_addr_frame_data), gnb_core->ed25519_public_key, gnb_core->ed25519_private_key);
+            gnb_send_to_node(gnb_core, gnb_core->index_node_ring.nodes[i], tmp_payload, GNB_ADDR_TYPE_IPV6|GNB_ADDR_TYPE_IPV4);
         }
 
     }
@@ -679,7 +688,7 @@ static void handle_detect_addr_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t 
     }
 
     if ( !ed25519_verify(detect_addr_frame->src_sign, (const unsigned char *)&detect_addr_frame->data, sizeof(struct detect_addr_frame_data), src_node->public_key) ) {
-        GNB_LOG3(gnb_core->log, GNB_LOG_ID_INDEX_WORKER, "111111 handle_detect_addr_frame error invalid signature src=%llu %s\n", node_uuid64, GNB_SOCKETADDRSTR1(sockaddress));
+        GNB_LOG3(gnb_core->log, GNB_LOG_ID_INDEX_WORKER, "handle_detect_addr_frame error invalid signature src=%llu %s\n", node_uuid64, GNB_SOCKETADDRSTR1(sockaddress));
         return;
     }
 
@@ -915,6 +924,8 @@ static void init(gnb_worker_t *gnb_worker, void *ctx){
     gnb_worker->ring_buffer_in = gnb_ring_buffer_fixed_init(memory, GNB_INDEX_WORKER_QUEUE_BLOCK_SIZE, gnb_core->conf->index_woker_queue_length);
     gnb_worker->ring_buffer_out = NULL;
     gnb_worker->ctx = index_worker_ctx;
+
+    gnb_worker->send_request_addr_frame_func = send_request_addr_frame;
 
     GNB_LOG1(gnb_core->log, GNB_LOG_ID_INDEX_WORKER, "%s in ring buffer size = %d\n", gnb_worker->name, gnb_core->conf->index_woker_queue_length);
     GNB_LOG1(gnb_core->log, GNB_LOG_ID_INDEX_WORKER, "%s init finish\n", gnb_worker->name);
