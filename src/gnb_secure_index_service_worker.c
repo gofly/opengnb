@@ -113,10 +113,10 @@ static void handle_post_addr_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *i
     src_uuid64 = gnb_ntohll(post_addr_frame->node_uuid64);
     src_node = GNB_HASH32_UINT64_GET_PTR(gnb_core->uuid_node_map, src_uuid64);
 
-    if ( NULL==src_node ) {
+    if ( src_node == NULL ) {
         GNB_LOG3(gnb_core->log, GNB_LOG_ID_INDEX_SERVICE_WORKER, "handle_post_addr_frame error src node not found src=%llu %s\n", src_uuid64, GNB_SOCKETADDRSTR1(sockaddress));
         return;
-    }        
+    }
 
     if ( !ed25519_verify(post_addr_frame->src_sign, (const unsigned char *)&post_addr_frame->data, sizeof(struct post_addr_frame_data), src_node->public_key) ) {
         GNB_LOG3(gnb_core->log, GNB_LOG_ID_INDEX_SERVICE_WORKER, "handle_post_addr_frame error invalid signature src=%llu %s\n", src_uuid64, GNB_SOCKETADDRSTR1(sockaddress));
@@ -132,15 +132,10 @@ static void handle_post_addr_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *i
     gnb_address_list_t *address6_list;
     gnb_address_list_t *address4_list;
 
-    if ( NULL == key_address ) {
+    if ( key_address == NULL ) {
 
-        key_address = (gnb_key_address_t *)alloca( sizeof(gnb_key_address_t) );
-
-        memset(key_address,0,sizeof(gnb_key_address_t));
-
-        GNB_LRU32_FIXED_STORE(index_service_worker_ctx->lru, post_addr_frame->data.src_key512, 64, key_address);
-
-        key_address = GNB_LRU32_HASH_GET_VALUE(index_service_worker_ctx->lru, post_addr_frame->data.src_key512, 64);
+        gnb_key_address_t new_key_address = {0}; // Initialize with zeros
+        key_address = GNB_LRU32_FIXED_STORE_AND_GET(index_service_worker_ctx->lru, post_addr_frame->data.src_key512, 64, &new_key_address);
 
         GNB_LOG4(gnb_core->log, GNB_LOG_ID_INDEX_SERVICE_WORKER, "HANDLE POST STORE src_uuid64[%llu] key[%s]\n", src_uuid64, GNB_HEX1_BYTE128(post_addr_frame->data.src_key512));
 
@@ -452,8 +447,8 @@ static void handle_request_addr_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t
     gnb_address_list_t *address6_list = (gnb_address_list_t *)l_key_address->address6_list_block;
     gnb_address_list_t *address4_list = (gnb_address_list_t *)l_key_address->address4_list_block;    
 
-    gnb_address_t *address = alloca(sizeof(gnb_address_t));
-
+    gnb_address_t address_st;
+    gnb_address_t *address = &address_st;
     address->ts_sec = index_service_worker_ctx->now_time_sec;
 
     if ( AF_INET6 == sockaddress->addr_type ) {

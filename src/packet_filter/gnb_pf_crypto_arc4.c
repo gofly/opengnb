@@ -27,6 +27,10 @@ typedef struct _gnb_pf_private_ctx_t {
     int save_time_seed_update_factor;
     gnb_hash32_map_t *arc4_ctx_map;
 
+    // S-Box 池，避免频繁在栈上拷贝
+    struct arc4_sbox sbox_pool[16];
+    int sbox_pool_idx;
+
 }gnb_pf_private_ctx_t;
 
 gnb_pf_t gnb_pf_crypto_arc4;
@@ -124,8 +128,6 @@ static int pf_tun_route_cb(gnb_core_t *gnb_core, gnb_pf_t *pf, gnb_pf_ctx_t *pf_
         init_arc4_keys(gnb_core,pf);
     }
 
-    struct arc4_sbox sbox;
-
     if ( NULL==pf_ctx->dst_node ) {
         return GNB_PF_ERROR;
     }
@@ -137,9 +139,12 @@ static int pf_tun_route_cb(gnb_core_t *gnb_core, gnb_pf_t *pf, gnb_pf_ctx_t *pf_
         return GNB_PF_ERROR;
     }
 
-    sbox = *sbox_init;
+    // 从池中获取一个 sbox
+    ctx->sbox_pool_idx = (ctx->sbox_pool_idx + 1) & 15; // & 15 is faster than % 16
+    struct arc4_sbox *sbox = &ctx->sbox_pool[ctx->sbox_pool_idx];
+    *sbox = *sbox_init;
 
-    arc4_crypt(&sbox, pf_ctx->ip_frame, pf_ctx->ip_frame_size);
+    arc4_crypt(sbox, pf_ctx->ip_frame, pf_ctx->ip_frame_size);
 
     return pf_ctx->pf_status;
 
@@ -167,9 +172,12 @@ static int pf_inet_route_cb(gnb_core_t *gnb_core, gnb_pf_t *pf, gnb_pf_ctx_t *pf
             return GNB_PF_ERROR;
         }
 
-        struct arc4_sbox sbox = *sbox_init;
+        // 从池中获取一个 sbox
+        ctx->sbox_pool_idx = (ctx->sbox_pool_idx + 1) & 15;
+        struct arc4_sbox *sbox = &ctx->sbox_pool[ctx->sbox_pool_idx];
+        *sbox = *sbox_init;
 
-        arc4_crypt(&sbox, pf_ctx->ip_frame, pf_ctx->ip_frame_size);
+        arc4_crypt(sbox, pf_ctx->ip_frame, pf_ctx->ip_frame_size);
 
     }
 
@@ -185,8 +193,6 @@ payload 发往用下一跳前，用下一跳节点的的密钥加密 payload
 static int pf_chain_relay_cb(gnb_core_t *gnb_core, gnb_pf_t *pf, gnb_pf_ctx_t *pf_ctx){
 
     gnb_pf_private_ctx_t *ctx = (gnb_pf_private_ctx_t *)pf->private_ctx;
-
-    struct arc4_sbox sbox;
 
     if ( !(pf_ctx->fwd_payload->sub_type & GNB_PAYLOAD_SUB_TYPE_IPFRAME_RELAY) ) {
         return pf_ctx->pf_status;
@@ -210,9 +216,12 @@ static int pf_chain_relay_cb(gnb_core_t *gnb_core, gnb_pf_t *pf, gnb_pf_ctx_t *p
             return GNB_PF_ERROR;
         }
 
-        sbox = *sbox_init;
+        // 从池中获取一个 sbox
+        ctx->sbox_pool_idx = (ctx->sbox_pool_idx + 1) & 15;
+        struct arc4_sbox *sbox = &ctx->sbox_pool[ctx->sbox_pool_idx];
+        *sbox = *sbox_init;
 
-        arc4_crypt(&sbox, pf_ctx->fwd_payload->data, gnb_payload16_data_len(pf_ctx->fwd_payload)-sizeof(gnb_uuid_t));
+        arc4_crypt(sbox, pf_ctx->fwd_payload->data, gnb_payload16_data_len(pf_ctx->fwd_payload)-sizeof(gnb_uuid_t));
 
     }
 
@@ -230,8 +239,6 @@ finish:
 static int pf_inet_frame_cb(gnb_core_t *gnb_core, gnb_pf_t *pf, gnb_pf_ctx_t *pf_ctx){
 
     gnb_pf_private_ctx_t *ctx = (gnb_pf_private_ctx_t *)pf->private_ctx;
-
-    struct arc4_sbox sbox;
     
     uint16_t payload_size;
 
@@ -255,9 +262,12 @@ static int pf_inet_frame_cb(gnb_core_t *gnb_core, gnb_pf_t *pf, gnb_pf_ctx_t *pf
         return GNB_PF_ERROR;
     }
 
-    sbox = *sbox_init;
+    // 从池中获取一个 sbox
+    ctx->sbox_pool_idx = (ctx->sbox_pool_idx + 1) & 15;
+    struct arc4_sbox *sbox = &ctx->sbox_pool[ctx->sbox_pool_idx];
+    *sbox = *sbox_init;
 
-    arc4_crypt(&sbox, pf_ctx->fwd_payload->data, gnb_payload16_data_len(pf_ctx->fwd_payload)-sizeof(gnb_uuid_t));
+    arc4_crypt(sbox, pf_ctx->fwd_payload->data, gnb_payload16_data_len(pf_ctx->fwd_payload)-sizeof(gnb_uuid_t));
 
 finish:
 

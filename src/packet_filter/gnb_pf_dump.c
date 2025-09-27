@@ -109,26 +109,6 @@ static int pf_tun_frame_cb(gnb_core_t *gnb_core, gnb_pf_t *pf, gnb_pf_ctx_t *pf_
 }
 
 
-static int pf_tun_route_cb(gnb_core_t *gnb_core, gnb_pf_t *pf, gnb_pf_ctx_t *pf_ctx){
-    return pf_ctx->pf_status;
-}
-
-
-static int pf_tun_fwd_cb(gnb_core_t *gnb_core, gnb_pf_t *pf, gnb_pf_ctx_t *pf_ctx){
-    return pf_ctx->pf_status;
-}
-
-
-static int pf_inet_frame_cb(gnb_core_t *gnb_core, gnb_pf_t *pf, gnb_pf_ctx_t *pf_ctx){
-    return pf_ctx->pf_status;
-}
-
-
-static int pf_inet_route_cb(gnb_core_t *gnb_core, gnb_pf_t *pf, gnb_pf_ctx_t *pf_ctx){
-    return pf_ctx->pf_status;
-}
-
-
 static int pf_inet_fwd_cb(gnb_core_t *gnb_core, gnb_pf_t *pf, gnb_pf_ctx_t *pf_ctx){
 
     char src_ipv4_string[INET_ADDRSTRLEN];
@@ -195,11 +175,11 @@ gnb_pf_t gnb_pf_dump = {
     .private_ctx   = NULL,
     .pf_init       = pf_init_cb,
     .pf_conf       = pf_conf_cb,
-    .pf_tun_frame  = pf_tun_frame_cb,
-    .pf_tun_route  = pf_tun_route_cb,
-    .pf_tun_fwd    = pf_tun_fwd_cb,
-    .pf_inet_frame = pf_inet_frame_cb,
-    .pf_inet_route = pf_inet_route_cb,
+    .pf_tun_frame  = pf_tun_frame_cb, // Dumps outgoing tun packets
+    .pf_tun_route  = NULL,
+    .pf_tun_fwd    = NULL,
+    .pf_inet_frame = NULL,
+    .pf_inet_route = NULL,
     .pf_inet_fwd   = pf_inet_fwd_cb,
     .pf_release    = pf_release_cb
 };

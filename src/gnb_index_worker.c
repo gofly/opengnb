@@ -355,11 +355,13 @@ static void handle_push_addr_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *i
         return;
     }
 
-    gnb_address_list_t *dst_address6_list = alloca( sizeof(gnb_address_list_t) + sizeof(gnb_address_t)*GNB_KEY_ADDRESS_NUM );
+    unsigned char dst_address6_list_block[sizeof(gnb_address_list_t) + sizeof(gnb_address_t)*GNB_KEY_ADDRESS_NUM];
+    gnb_address_list_t *dst_address6_list = (gnb_address_list_t *)dst_address6_list_block;
     memset(dst_address6_list, 0, sizeof(gnb_address_list_t) + sizeof(gnb_address_t)*GNB_KEY_ADDRESS_NUM);
     dst_address6_list->size = GNB_KEY_ADDRESS_NUM;
 
-    gnb_address_list_t *dst_address4_list = alloca( sizeof(gnb_address_list_t) + sizeof(gnb_address_t)*GNB_KEY_ADDRESS_NUM );
+    unsigned char dst_address4_list_block[sizeof(gnb_address_list_t) + sizeof(gnb_address_t)*GNB_KEY_ADDRESS_NUM];
+    gnb_address_list_t *dst_address4_list = (gnb_address_list_t *)dst_address4_list_block;
     memset(dst_address4_list, 0, sizeof(gnb_address_list_t) + sizeof(gnb_address_t)*GNB_KEY_ADDRESS_NUM);
     dst_address4_list->size = GNB_KEY_ADDRESS_NUM;
 
@@ -524,7 +526,8 @@ static void handle_echo_addr_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *i
         return;
     }
 
-    gnb_address_t *address = alloca(sizeof(gnb_address_t));
+    gnb_address_t address_st;
+    gnb_address_t *address = &address_st;
 
     if ( AF_INET6 == sockaddress->addr_type ) {
         gnb_set_address6(address, &sockaddress->addr.in6);
@@ -607,7 +610,8 @@ static void handle_detect_addr_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t 
         return;
     }
 
-    gnb_address_t *address = alloca(sizeof(gnb_address_t));
+    gnb_address_t address_st;
+    gnb_address_t *address = &address_st;
 
     memset(address,0,sizeof(gnb_address_t));
 

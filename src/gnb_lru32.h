@@ -75,8 +75,11 @@ void gnb_lru32_store(gnb_lru32_t *lru, unsigned char *key, uint32_t key_len, voi
 //传入的data会拷贝到lru中一块内存里，相同的key存入数据会覆盖之前的数据，
 //每个key对应的内存块是预先申请好的，大小一致的，在调用gnb_lru32_creates时通过block_size设定
 //用这个函数保存小块数据到lru是效率最高的，不需要频繁申请/释放内存
-void gnb_lru32_fixed_store(gnb_lru32_t *lru, unsigned char *key, uint32_t key_len, void *data);
+gnb_lru32_node_t* gnb_lru32_fixed_store(gnb_lru32_t *lru, unsigned char *key, uint32_t key_len, void *data);
 #define GNB_LRU32_FIXED_STORE(lru,key,key_len,data) gnb_lru32_fixed_store(lru,(unsigned char *)key,(uint32_t)key_len, data)
+
+#define GNB_LRU32_FIXED_STORE_AND_GET(lru,key,key_len,data) \
+    GNB_LRU32_VALUE(gnb_lru32_fixed_store(lru,(unsigned char *)key,(uint32_t)key_len, data))
 
 //这个函数不会把命中的节点移到链表首部，需要调用 gnb_lru32_movetohead 实现
 gnb_lru32_node_t* gnb_lru32_hash_get(gnb_lru32_t *lru, unsigned char *key, uint32_t key_len);

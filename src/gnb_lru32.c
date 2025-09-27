@@ -198,19 +198,19 @@ void gnb_lru32_store(gnb_lru32_t *lru, unsigned char *key, uint32_t key_len, voi
 }
 
 
-void gnb_lru32_fixed_store(gnb_lru32_t *lru, unsigned char *key, uint32_t key_len, void *data){
+gnb_lru32_node_t* gnb_lru32_fixed_store(gnb_lru32_t *lru, unsigned char *key, uint32_t key_len, void *data){
 
     gnb_lru32_node_t *lru_node;
 
     if ( 0 == lru->block_size ) {
-        return;
+        return NULL;
     }
 
     lru_node = gnb_lru32_get(lru, key, key_len);
 
     if ( NULL != lru_node ) {
         memcpy(lru_node->udata,data,lru->block_size);
-        return;
+        return lru_node;
     }
     
     void *pop_udata = NULL;
@@ -222,7 +222,7 @@ void gnb_lru32_fixed_store(gnb_lru32_t *lru, unsigned char *key, uint32_t key_le
     lru_node = gnb_lru32_node_fixed_pool_pop(lru);
     
     if ( NULL == lru_node ) {
-        return;
+        return NULL;
     }
 
     memcpy(lru_node->udata,data,lru->block_size);
@@ -236,7 +236,7 @@ void gnb_lru32_fixed_store(gnb_lru32_t *lru, unsigned char *key, uint32_t key_le
     
     lru->size++;
 
-    return;
+    return lru_node;
     
 }
 
