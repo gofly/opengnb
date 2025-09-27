@@ -64,6 +64,7 @@ GNB_OBJS =                                       \
        ./src/gnb_conf.o                          \
        ./src/gnb_conf_file.o                     \
        ./src/gnb_config_lite.o                   \
+       ./src/gnb_utils.o                         \
        ./src/gnb_node.o                          \
        ./src/gnb_udp.o                           \
        ./src/gnb_payload16.o                     \
@@ -113,8 +114,11 @@ GNB_ES_OBJS =                                    \
       ./src/gnb_dir.o                            \
       ./src/gnb_hash32.o                         \
       ./src/gnb_conf.o                           \
+      ./src/gnb_utils.o                           \
       ./src/gnb_arg_list.o                       \
       ./src/gnb_nodeid.o                         \
+      ./src/gnb_http_client.o                    \
+      ./src/jsmn/jsmn.o                          \
       ./libs/hash/murmurhash.o
 
 

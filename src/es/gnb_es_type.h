@@ -67,6 +67,9 @@ typedef struct _gnb_es_ctx{
 	char *upnp_multicase_if;
     char *upnp_gateway4;
 
+	char *doh_host;
+	uint16_t doh_port;
+
 	int resolv_opt;
 
 	int broadcast_address_opt;
