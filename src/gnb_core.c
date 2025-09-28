@@ -920,6 +920,10 @@ void gnb_core_stop(gnb_core_t *gnb_core){
         gnb_core->node_worker->stop(gnb_core->node_worker);
     }
 
+    if (gnb_core->exporter_worker) {
+        gnb_core->exporter_worker->stop(gnb_core->exporter_worker);
+    }
+
     gnb_core->loop_flag = 0;
 
 #ifdef __UNIX_LIKE_OS__
