@@ -194,6 +194,8 @@ typedef struct _gnb_conf_t {
 
 	uint8_t quiet;
 
+	uint16_t exporter_port;
+
 }gnb_conf_t;
 
 
