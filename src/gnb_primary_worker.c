@@ -1057,7 +1057,7 @@ static void init(gnb_worker_t *gnb_worker, void *ctx){
     }
 
 skip_crypto:
-
+    ;
     // 为所有新创建的过滤器实例调用初始化函数
     int i;
     for (i = 0; i < pf_core->pf_install_array->num; i++) {
