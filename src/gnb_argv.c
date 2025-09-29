@@ -1014,21 +1014,7 @@ gnb_conf_t* gnb_argv(int argc,char *argv[]){
 
     }
 
-    if ( 0 == conf->lite_mode && 0==conf->public_index_service ) {
-
-        if ( '\0' == conf->map_file[0] ) {
-            snprintf(conf->map_file, PATH_MAX+NAME_MAX, "%s/%s", conf->conf_dir, "gnb.map");
-        }
-
-        if ( '\0' == conf->pid_file[0] ) {
-            snprintf(conf->pid_file, PATH_MAX+NAME_MAX,"%s/%s", conf->conf_dir, "gnb.pid");
-        }
-
-        if ( '\0' == conf->node_cache_file[0] ) {
-            snprintf(conf->node_cache_file, PATH_MAX+NAME_MAX,"%s/%s", conf->conf_dir, "node_cache.dump");
-        }
-
-    } else {
+    if ( 1 == conf->lite_mode || 1 == conf->public_index_service ) {
 
         conf->conf_dir[0] = '\0';
 
@@ -1046,8 +1032,9 @@ gnb_conf_t* gnb_argv(int argc,char *argv[]){
 
     }
 
-    if ( NULL != ctl_block_file ) {
-        snprintf(conf->map_file,        PATH_MAX+NAME_MAX, "%s",       ctl_block_file);
+    // 命令行 -b/--ctl-block 是 map_file 的别名，只有在 map_file 未被设置时才生效
+    if ( NULL != ctl_block_file && '\0' == conf->map_file[0] ) {
+        snprintf(conf->map_file, PATH_MAX+NAME_MAX, "%s", ctl_block_file);
     }
 
     char  resolved_path[PATH_MAX+NAME_MAX];
