@@ -1045,6 +1045,17 @@ void local_node_file_config(gnb_conf_t *conf){
 
         }
 
+        if ( !strncmp(line_buffer, "node-cache-file", sizeof("node-cache-file")-1) ) {
+
+            num = sscanf(line_buffer, "%32[^ ] %512s", field, conf->node_cache_file);
+
+            if ( 2 != num ) {
+                printf("config %s error in [%s]\n", "node-cache-file", node_conf_file);
+                exit(1);
+            }
+
+        }
+
 
         if ( !strncmp(line_buffer, "pf-route", sizeof("pf-route")-1) ) {
 
@@ -1183,6 +1194,20 @@ void local_node_file_config(gnb_conf_t *conf){
     }while(1);
 
     fclose(file);    
+
+    // 如果以下文件路径既没有通过命令行设置，也没有在 node.conf 中配置，则设置默认值
+    // 优先级: 命令行 > node.conf > 默认值
+    if ( '\0' == conf->map_file[0] ) {
+        snprintf(conf->map_file, PATH_MAX+NAME_MAX, "%s/%s", conf->conf_dir, "gnb.map");
+    }
+
+    if ( '\0' == conf->pid_file[0] ) {
+        snprintf(conf->pid_file, PATH_MAX+NAME_MAX,"%s/%s", conf->conf_dir, "gnb.pid");
+    }
+
+    if ( '\0' == conf->node_cache_file[0] ) {
+        snprintf(conf->node_cache_file, PATH_MAX+NAME_MAX,"%s/%s", conf->conf_dir, "node_cache.dump");
+    }
 
     if ( 1 == conf->multi_socket ) {
         conf->udp6_socket_num = 1;
