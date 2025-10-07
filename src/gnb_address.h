@@ -40,6 +40,9 @@ void gnb_address_list_release(gnb_address_list_t *address_list);
 //返回 -1 没有找到,  >0 为 address 在 list 中的索引编号
 int gnb_address_list_find(gnb_address_list_t *address_list, gnb_address_t *address);
 
+int gnb_address_list_has_ipv4(gnb_address_list_t *address_list);
+int gnb_address_list_has_ipv6(gnb_address_list_t *address_list);
+
 //把 address 放进列表中一个空的项里
 void gnb_address_list_update(gnb_address_list_t *address_list, gnb_address_t *address);
 

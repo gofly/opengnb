@@ -653,3 +653,30 @@ int gnb_determine_subnet4(struct in_addr addr4_a, struct in_addr addr4_b, struct
     return 0;
 
 }
+
+int gnb_address_list_has_ipv4(gnb_address_list_t *address_list) {
+    if (!address_list) {
+        return 0;
+    }
+    int i;
+    for (i = 0; i < address_list->num; i++) {
+        if (address_list->array[i].type == AF_INET) {
+            return 1; // Found an IPv4 address
+        }
+    }
+    return 0; // No IPv4 address found
+}
+
+
+int gnb_address_list_has_ipv6(gnb_address_list_t *address_list) {
+    if (!address_list) {
+        return 0;
+    }
+    int i;
+    for (i = 0; i < address_list->num; i++) {
+        if (address_list->array[i].type == AF_INET6) {
+            return 1; // Found an IPv6 address
+        }
+    }
+    return 0; // No IPv6 address found
+}
