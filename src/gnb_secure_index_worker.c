@@ -120,7 +120,7 @@ static void send_post_addr_frame(gnb_worker_t *gnb_index_worker){
 }
 
 /*crypto and sign*/
-static void send_request_addr_frame(gnb_worker_t *gnb_index_worker, gnb_node_t *node){
+static int send_request_addr_frame(gnb_worker_t *gnb_index_worker, gnb_node_t *node){
 
     index_worker_ctx_t *index_worker_ctx = gnb_index_worker->ctx;
     gnb_address_t *address;
@@ -129,7 +129,7 @@ static void send_request_addr_frame(gnb_worker_t *gnb_index_worker, gnb_node_t *
     int i;
 
     if ( 0 == gnb_core->index_address_ring.address_list->num ) {
-        return;
+        return -1;
     }
 
     index_worker_ctx->index_frame_payload->sub_type = PAYLOAD_SUB_TYPE_REQUEST_ADDR;
@@ -183,10 +183,10 @@ static void send_request_addr_frame(gnb_worker_t *gnb_index_worker, gnb_node_t *
 
     }
 
-    node->last_request_addr_sec = index_worker_ctx->now_time_sec;
-
     GNB_DEBUG5(gnb_core->log, GNB_LOG_ID_INDEX_WORKER, "SEND REQUEST ADDR %llu ==>%u lkey[%s] rkey[%s]\n", gnb_core->local_node->uuid64, node->uuid64, GNB_HEX1_BYTE128(gnb_core->local_node->key512), GNB_HEX2_BYTE128(node->key512));
  
+    return 0;
+
 }
 
 /*crypto and sign*/
@@ -568,8 +568,7 @@ static void sync_index_node(gnb_worker_t *gnb_index_worker){
             continue;
         }
 
-
-        if ( (GNB_NODE_STATUS_IPV6_PONG | GNB_NODE_STATUS_IPV4_PONG) & node->udp_addr_status ) {
+        if ( node->detect_count >= GNB_NODE_MAX_DETECT_TIMES ) {
             continue;
         }
 
@@ -578,13 +577,47 @@ static void sync_index_node(gnb_worker_t *gnb_index_worker){
             continue;
         }
 
-        if ( node->detect_count < GNB_NODE_MAX_DETECT_TIMES ) {
-            detect_node_addr(gnb_index_worker, node);
+        // 只有当所有期望的协议栈都建立P2P连接后才跳过
+        if ( (gnb_core->conf->udp_socket_type & GNB_ADDR_TYPE_IPV4) && (gnb_core->conf->udp_socket_type & GNB_ADDR_TYPE_IPV6) ) {
+            // 双栈模式：需要v4和v6都PONG成功
+            if ( (node->udp_addr_status & GNB_NODE_STATUS_IPV4_PONG) && (node->udp_addr_status & GNB_NODE_STATUS_IPV6_PONG) ) { // v4和v6都已连接
+                continue;
+            }
+ 
+            // 如果v6已连接，但v4未连接，检查对端是否真的有v4地址。如果没有，就停止探测。
+            if ( (node->udp_addr_status & GNB_NODE_STATUS_IPV6_PONG) && !(node->udp_addr_status & GNB_NODE_STATUS_IPV4_PONG) ) {
+                gnb_address_list_t *static_list = (gnb_address_list_t *)&node->static_address_block;
+                gnb_address_list_t *push_list = (gnb_address_list_t *)&node->push_address_block;
+                gnb_address_list_t *dynamic_list = (gnb_address_list_t *)&node->dynamic_address_block;
+                gnb_address_list_t *resolv_list = (gnb_address_list_t *)&node->resolv_address_block;
+                if ( !gnb_address_list_has_ipv4(static_list) && !gnb_address_list_has_ipv4(push_list) && !gnb_address_list_has_ipv4(dynamic_list) && !gnb_address_list_has_ipv4(resolv_list) ) {
+                    continue; // 对端没有任何已知的IPv4地址，停止探测
+                }
+            }
+ 
+            // 如果v4已连接，但v6未连接，检查对端是否真的有v6地址。如果没有，就停止探测。
+            if ( (node->udp_addr_status & GNB_NODE_STATUS_IPV4_PONG) && !(node->udp_addr_status & GNB_NODE_STATUS_IPV6_PONG) ) {
+                gnb_address_list_t *static_list = (gnb_address_list_t *)&node->static_address_block;
+                gnb_address_list_t *push_list = (gnb_address_list_t *)&node->push_address_block;
+                gnb_address_list_t *dynamic_list = (gnb_address_list_t *)&node->dynamic_address_block;
+                gnb_address_list_t *resolv_list = (gnb_address_list_t *)&node->resolv_address_block;
+                if ( !gnb_address_list_has_ipv6(static_list) && !gnb_address_list_has_ipv6(push_list) && !gnb_address_list_has_ipv6(dynamic_list) && !gnb_address_list_has_ipv6(resolv_list) ) {
+                    continue; // 对端没有任何已知的IPv6地址，停止探测
+                }
+            }
+        } else if ( (gnb_core->conf->udp_socket_type & GNB_ADDR_TYPE_IPV4) && (node->udp_addr_status & GNB_NODE_STATUS_IPV4_PONG) ) {
+            // IPv4-only模式
+            continue;
+        } else if ( (gnb_core->conf->udp_socket_type & GNB_ADDR_TYPE_IPV6) && (node->udp_addr_status & GNB_NODE_STATUS_IPV6_PONG) ) {
+            // IPv6-only模式
+            continue;
         }
 
-        send_request_addr_frame(gnb_index_worker,node);
+        detect_node_addr(gnb_index_worker, node);
 
-        node->last_request_addr_sec = index_worker_ctx->now_time_sec;
+        if ( 0 == send_request_addr_frame(gnb_index_worker,node) ) {
+            node->last_request_addr_sec = index_worker_ctx->now_time_sec;
+        }
 
     }
 
