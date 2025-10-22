@@ -392,9 +392,10 @@ static void handle_ping_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *node_w
             uint16_t tun_port_net = 0;
             memcpy(&tun_port_net, node_ping_frame->data.attachment, sizeof(uint16_t)); // 假定 attachment 为网络字节序
 
-            /* 不要修改 src_node->udp_sockaddr4.sin_addr（那是接收到的 LAN IP），
-            仅更新端口（如果与已记录的端口不同） */
-            if ( src_node->udp_sockaddr4.sin_port != tun_port_net ) {
+            /* 对于 LAN_PING，IP 应该是收到包的源 IP，端口是 attachment 里的 tun_port */
+            if (src_node->udp_sockaddr4.sin_addr.s_addr != node_addr->addr.in.sin_addr.s_addr ||
+                src_node->udp_sockaddr4.sin_port != tun_port_net) {
+                src_node->udp_sockaddr4.sin_addr = node_addr->addr.in.sin_addr;
                 src_node->udp_sockaddr4.sin_port = tun_port_net;
                 addr_update = 1;
             }

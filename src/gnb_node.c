@@ -718,52 +718,46 @@ finish:
 
 
 int gnb_p2p_forward_payload_to_node(gnb_core_t *gnb_core, gnb_node_t *node, gnb_payload16_t *payload){
+    int ret = -1;
+    int use_ipv6 = 0;
+    int use_ipv4 = 0;
 
-    int ret;
+    int can_ipv6 = (node->udp_addr_status & GNB_NODE_STATUS_IPV6_PONG) &&
+                   (gnb_core->conf->udp_socket_type & GNB_ADDR_TYPE_IPV6) &&
+                   (memcmp(&node->udp_sockaddr6.sin6_addr, &in6addr_any, sizeof(struct in6_addr)) != 0);
 
-    // gnb_core->conf->udp_socket_type 默认是 GNB_ADDR_TYPE_IPV4 | GNB_ADDR_TYPE_IPV6;
-    if ( GNB_ADDR_TYPE_IPV4 == gnb_core->conf->udp_socket_type ) {
-        goto send_by_ipv4;
-    } else if ( GNB_ADDR_TYPE_IPV6 == gnb_core->conf->udp_socket_type ) {
-        goto send_by_ipv6;
+    int can_ipv4 = (node->udp_addr_status & GNB_NODE_STATUS_IPV4_PONG) &&
+                   (gnb_core->conf->udp_socket_type & GNB_ADDR_TYPE_IPV4) &&
+                   (node->udp_sockaddr4.sin_addr.s_addr != INADDR_ANY);
+
+    if (can_ipv6 && can_ipv4) {
+        // 两条路径都可用，选择延迟更低的
+        // 如果 addr6_ping_latency_usec <= 0，说明延迟未知或无效，优先选IPv4
+        // 如果 addr4_ping_latency_usec <= 0，说明延迟未知或无效，优先选IPv6
+        if (node->addr6_ping_latency_usec > 0 && node->addr4_ping_latency_usec > 0) {
+            if (node->addr6_ping_latency_usec <= node->addr4_ping_latency_usec) {
+                use_ipv6 = 1;
+            } else {
+                use_ipv4 = 1;
+            }
+        } else if (node->addr6_ping_latency_usec > 0) {
+            use_ipv6 = 1;
+        } else { // 默认或仅有IPv4延迟有效时
+            use_ipv4 = 1;
+        }
+    } else if (can_ipv6) {
+        use_ipv6 = 1;
+    } else if (can_ipv4) {
+        use_ipv4 = 1;
     }
 
-    if ( (node->udp_addr_status & GNB_NODE_STATUS_IPV6_PONG) && (node->udp_addr_status & GNB_NODE_STATUS_IPV4_PONG) ) {
-
-        if ( 0 == node->addr4_ping_latency_usec ) {
-            goto send_by_ipv6;
-        }
-
-        if ( 0 == node->addr6_ping_latency_usec ) {
-            goto send_by_ipv4;
-        }
-
-        if ( node->addr4_ping_latency_usec >= node->addr6_ping_latency_usec ) {
-            goto send_by_ipv6;
-        } else {
-            goto send_by_ipv4;
-        }
-
-    }
-
-send_by_ipv6:
-
-    if ( (node->udp_addr_status & GNB_NODE_STATUS_IPV6_PONG) && (gnb_core->conf->udp_socket_type & GNB_ADDR_TYPE_IPV6) && memcmp(&node->udp_sockaddr6.sin6_addr,&in6addr_any,sizeof(struct in6_addr)) ) {
-
+    if (use_ipv6) {
         sendto(gnb_core->udp_ipv6_sockets[node->socket6_idx],(void *)payload, GNB_PAYLOAD16_FRAME_SIZE(payload), 0, (struct sockaddr *)&node->udp_sockaddr6, sizeof(struct sockaddr_in6) );
-
-        goto finish;
-
+    } else if (use_ipv4) {
+        sendto(gnb_core->udp_ipv4_sockets[node->socket4_idx], (void *)payload, GNB_PAYLOAD16_FRAME_SIZE(payload), 0, (struct sockaddr *)&node->udp_sockaddr4, sizeof(struct sockaddr_in));
     }
-
-send_by_ipv4:
-
-    ret = sendto(gnb_core->udp_ipv4_sockets[ node->socket4_idx ], (void *)payload, GNB_PAYLOAD16_FRAME_SIZE(payload), 0, (struct sockaddr *)&node->udp_sockaddr4, sizeof(struct sockaddr_in));
-
-finish:
 
     return 0;
-
 }
 
 
