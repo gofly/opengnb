@@ -209,7 +209,7 @@ int gnb_unified_forwarding_with_multi_path_tun(gnb_core_t *gnb_core, gnb_pf_ctx_
         GNB_LOG3(gnb_core->log, GNB_LOG_ID_PF, "*>> Unified Forwarding with Multi-Path to tun %llu=>%llu=>%llu seq=%"PRIu64" *>>\n", gnb_core->local_node->uuid64, dst_node->uuid64, dst_node->unified_forwarding_nodeid, dst_node->unified_forwarding_send_seq);
 
         //最多转发5个节点
-        if ( c >= 5 ) {
+        if ( c >= GNB_UNIFIED_FORWARDING_MAX_MULTI_PATH ) {
             break;
         }
 
