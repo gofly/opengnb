@@ -81,5 +81,4 @@ int gnb_log_udp_set_addr4_string(gnb_log_ctx_t *log, char *sockaddress4_string);
 #define GNB_ERROR4(log,log_id,format,...) GNB_LOG_INTERNAL(log, log_id, GNB_LOG_TYPE_ERROR, GNB_LOG_LEVEL4, format, ##__VA_ARGS__)
 #define GNB_ERROR5(log,log_id,format,...) GNB_LOG_INTERNAL(log, log_id, GNB_LOG_TYPE_ERROR, GNB_LOG_LEVEL5, format, ##__VA_ARGS__)
 
-
 #endif
