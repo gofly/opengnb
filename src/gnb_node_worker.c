@@ -464,8 +464,17 @@ static void handle_ping_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *node_w
         ed25519_sign(node_pong_frame->src_sign, (const unsigned char *)&node_pong_frame->data, sizeof(struct pong_frame_data), gnb_core->ed25519_public_key, gnb_core->ed25519_private_key);
     }
 
-    // 不论 PING 从哪个地址来，都向节点的 IPv4 和 IPv6 地址发送 PONG，以尝试建立双向连接
-    gnb_send_to_node(gnb_core, src_node, node_worker_ctx->node_frame_payload, GNB_ADDR_TYPE_IPV4 | GNB_ADDR_TYPE_IPV6);
+    // PONG应该只响应给PING来源的地址
+    unsigned char addr_type_to_respond = 0;
+    if (AF_INET == node_addr->addr_type) {
+        addr_type_to_respond = GNB_ADDR_TYPE_IPV4;
+    } else if (AF_INET6 == node_addr->addr_type) {
+        addr_type_to_respond = GNB_ADDR_TYPE_IPV6;
+    }
+
+    if (addr_type_to_respond) {
+        gnb_send_to_node(gnb_core, src_node, node_worker_ctx->node_frame_payload, addr_type_to_respond);
+    }
 }
 
 
@@ -479,6 +488,8 @@ static void handle_pong_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *node_w
     gnb_uuid_t dst_uuid64 = gnb_ntohll(node_pong_frame->data.dst_uuid64);
 
     uint64_t dst_ts_usec = gnb_ntohll(node_pong_frame->data.dst_ts_usec);
+
+    uint64_t now_time_usec = gnb_timestamp_usec();
 
     //收到pong frame，需要更新node的addr
     gnb_sockaddress_t *node_addr = &node_worker_in_data->node_addr_st;
@@ -514,8 +525,8 @@ static void handle_pong_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *node_w
         return;
     }
 
-    if ( node_worker_ctx->now_time_usec > dst_ts_usec ) {
-        address_st.latency_usec = node_worker_ctx->now_time_usec - dst_ts_usec;
+    if ( now_time_usec > dst_ts_usec ) {
+        address_st.latency_usec = now_time_usec - dst_ts_usec;
     } else {
         address_st.latency_usec = 1;
     }
@@ -551,20 +562,20 @@ static void handle_pong_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *node_w
 
         src_node->addr6_update_ts_sec = node_worker_ctx->now_time_sec;
 
-        if ( dst_ts_usec == src_node->ping_ts_usec ) {
-
-            src_node->addr6_ping_latency_usec = node_worker_ctx->now_time_usec - dst_ts_usec + 1;
-            if ( 0 == src_node->addr6_ping_latency_usec ) {
-                GNB_LOG3(gnb_core->log, GNB_LOG_ID_NODE_WORKER, "addr6_ping_latency_usec==0 now=%"PRIu64" dst_ts=%"PRIu64"\n", node_worker_ctx->now_time_usec, dst_ts_usec);
+        // 只有PONG包才计算延迟
+        if (PAYLOAD_SUB_TYPE_PONG == node_worker_in_data->payload_st.sub_type) {
+            if ( dst_ts_usec == src_node->ping_ts_usec ) {
+                src_node->addr6_ping_latency_usec = now_time_usec - dst_ts_usec + 1;
+            } else {
+                src_node->addr6_ping_latency_usec = 0; // 时间戳不匹配，重置延迟
             }
-
         }
 
         GNB_LOG3(gnb_core->log, GNB_LOG_ID_NODE_WORKER, "handle_pong_frame IPV6 src[%llu]->dst[%llu] idx=%u %s now=%"PRIu64" dst_ts=%"PRIu64" up=%u latency=%"PRId64"\n",
                 src_node->uuid64, dst_uuid64,
                 node_worker_in_data->socket_idx,
                 GNB_SOCKADDR6STR1(&src_node->udp_sockaddr6),
-                node_worker_ctx->now_time_usec, dst_ts_usec, addr_update, src_node->addr6_ping_latency_usec);
+                now_time_usec, dst_ts_usec, addr_update, src_node->addr6_ping_latency_usec);
 
         break;
     case AF_INET:
@@ -597,20 +608,20 @@ static void handle_pong_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *node_w
 
         src_node->addr4_update_ts_sec = node_worker_ctx->now_time_sec;
 
-        if ( dst_ts_usec == src_node->ping_ts_usec ) {
-
-            src_node->addr4_ping_latency_usec = node_worker_ctx->now_time_usec - dst_ts_usec  + 1;
-            if ( 0 == src_node->addr4_ping_latency_usec ) {
-                GNB_LOG3(gnb_core->log, GNB_LOG_ID_NODE_WORKER, "addr4_ping_latency_usec=0 now=%"PRIu64" dst_ts=%"PRIu64"\n", node_worker_ctx->now_time_usec, dst_ts_usec);
+        // 只有PONG包才计算延迟
+        if (PAYLOAD_SUB_TYPE_PONG == node_worker_in_data->payload_st.sub_type) {
+            if ( dst_ts_usec == src_node->ping_ts_usec ) {
+                src_node->addr4_ping_latency_usec = now_time_usec - dst_ts_usec  + 1;
+            } else {
+                src_node->addr4_ping_latency_usec = 0; // 时间戳不匹配，重置延迟
             }
-
         }
 
         GNB_LOG3(gnb_core->log, GNB_LOG_ID_NODE_WORKER, "handle_pong_frame IPV4 src[%llu]->dst[%llu] idx=%u %s now=%"PRIu64" dst_ts=%"PRIu64" up=%u latency=%"PRId64"\n",
                 src_node->uuid64, dst_uuid64,
                 node_worker_in_data->socket_idx,
                 GNB_SOCKADDR4STR1(&src_node->udp_sockaddr4),
-                node_worker_ctx->now_time_usec, dst_ts_usec, addr_update, src_node->addr4_ping_latency_usec);
+                now_time_usec, dst_ts_usec, addr_update, src_node->addr4_ping_latency_usec);
         break;
     }
 
@@ -740,21 +751,30 @@ static void sync_node(gnb_worker_t *gnb_node_worker){
 
         }
 
+        // 当双栈都连接时，如果一个协议栈在 GNB_NODE_PING_INTERVAL_SEC 内没有更新，
+        // 则认为该路径可能已失效，仅清除PONG状态，依赖下一次常规PING进行重新探测。
+        if ((node->udp_addr_status & GNB_NODE_STATUS_IPV4_PONG) && (node->udp_addr_status & GNB_NODE_STATUS_IPV6_PONG)) {
+            if ((node_worker_ctx->now_time_sec - node->addr4_update_ts_sec) > GNB_NODE_PING_INTERVAL_SEC) {
+                node->udp_addr_status &= ~GNB_NODE_STATUS_IPV4_PONG;
+                GNB_LOG2(gnb_core->log, GNB_LOG_ID_NODE_WORKER, "IPv4 path for node %llu seems unstable, will re-ping on next cycle.\n", node->uuid64);
+            }
+            if ((node_worker_ctx->now_time_sec - node->addr6_update_ts_sec) > GNB_NODE_PING_INTERVAL_SEC) {
+                node->udp_addr_status &= ~GNB_NODE_STATUS_IPV6_PONG;
+                GNB_LOG2(gnb_core->log, GNB_LOG_ID_NODE_WORKER, "IPv6 path for node %llu seems unstable, will re-ping on next cycle.\n", node->uuid64);
+            }
+        }
+
         if ( (node_worker_ctx->now_time_sec - node->ping_ts_sec) >= GNB_NODE_PING_INTERVAL_SEC ) {
             send_ping_frame(gnb_core, node);
         }
 
         if (  GNB_UNIFIED_FORWARDING_OFF != gnb_core->conf->unified_forwarding && (node_worker_ctx->now_time_sec - node->last_notify_uf_nodes_ts_sec) >= GNB_UF_NODES_NOTIFY_INTERVAL_SEC ) {
-
             if ( !( (GNB_NODE_STATUS_IPV6_PONG | GNB_NODE_STATUS_IPV4_PONG) & node->udp_addr_status ) ) {
                 continue;
             }
-
             GNB_LOG3(gnb_core->log, GNB_LOG_ID_NODE_WORKER, "unifield_forwarding_notify nodeid=%llu\n", node->uuid64);
             unifield_forwarding_notify(gnb_core, node);
-
             node->last_notify_uf_nodes_ts_sec = node_worker_ctx->now_time_sec;
-
         }
 
         if ( (node_worker_ctx->now_time_sec - node->addr4_update_ts_sec) > GNB_NODE_UPDATE_INTERVAL_SEC ) {
@@ -770,22 +790,6 @@ static void sync_node(gnb_worker_t *gnb_node_worker){
             //节点状态超时，且不是idx node, 可能目标node已经下线或者更换了ip
             if ( !(node->type & GNB_NODE_TYPE_IDX) ) {
                 node->udp_addr_status &= ~(GNB_NODE_STATUS_IPV6_PONG | GNB_NODE_STATUS_IPV6_PING);
-            }
-
-        }
-
-        // 当双栈都连接时，如果一个协议栈在 GNB_NODE_PING_INTERVAL_SEC 内没有更新，
-        // 则认为该路径可能已失效，主动置0并触发PING
-        if ((node->udp_addr_status & GNB_NODE_STATUS_IPV4_PONG) && (node->udp_addr_status & GNB_NODE_STATUS_IPV6_PONG)) {
-            if ((node_worker_ctx->now_time_sec - node->addr4_update_ts_sec) > GNB_NODE_PING_INTERVAL_SEC) {
-                node->udp_addr_status &= ~GNB_NODE_STATUS_IPV4_PONG;
-                send_ping_frame(gnb_core, node); // 重新探测
-                GNB_LOG2(gnb_core->log, GNB_LOG_ID_NODE_WORKER, "IPv4 path for node %llu seems unstable, re-pinging.\n", node->uuid64);
-            }
-            if ((node_worker_ctx->now_time_sec - node->addr6_update_ts_sec) > GNB_NODE_PING_INTERVAL_SEC) {
-                node->udp_addr_status &= ~GNB_NODE_STATUS_IPV6_PONG;
-                send_ping_frame(gnb_core, node); // 重新探测
-                GNB_LOG2(gnb_core->log, GNB_LOG_ID_NODE_WORKER, "IPv6 path for node %llu seems unstable, re-pinging.\n", node->uuid64);
             }
         }
     }
