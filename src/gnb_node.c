@@ -688,12 +688,16 @@ int gnb_send_to_node(gnb_core_t *gnb_core, gnb_node_t *node, gnb_payload16_t *pa
 
     int i;
 
-    if ( (GNB_ADDR_TYPE_IPV4 & addr_type_bits) && (gnb_core->conf->udp_socket_type & GNB_ADDR_TYPE_IPV4) && INADDR_ANY != node->udp_sockaddr4.sin_addr.s_addr ) {
-
-        for (i=0; i<gnb_core->conf->udp4_socket_num; i++) {
-            sendto(gnb_core->udp_ipv4_sockets[ i ], (void *)payload, GNB_PAYLOAD16_FRAME_SIZE(payload), 0, (struct sockaddr *)&node->udp_sockaddr4, sizeof(struct sockaddr_in));
+    if ((GNB_ADDR_TYPE_IPV4 & addr_type_bits) && (gnb_core->conf->udp_socket_type & GNB_ADDR_TYPE_IPV4) && INADDR_ANY != node->udp_sockaddr4.sin_addr.s_addr) {
+        // 如果已经有PONG状态，说明连接已建立，直接使用对应的socket
+        if (node->udp_addr_status & GNB_NODE_STATUS_IPV4_PONG) {
+            sendto(gnb_core->udp_ipv4_sockets[node->socket4_idx], (void *)payload, GNB_PAYLOAD16_FRAME_SIZE(payload), 0, (struct sockaddr *)&node->udp_sockaddr4, sizeof(struct sockaddr_in));
+        } else {
+            // 否则，遍历所有socket进行探测
+            for (i = 0; i < gnb_core->conf->udp4_socket_num; i++) {
+                sendto(gnb_core->udp_ipv4_sockets[i], (void *)payload, GNB_PAYLOAD16_FRAME_SIZE(payload), 0, (struct sockaddr *)&node->udp_sockaddr4, sizeof(struct sockaddr_in));
+            }
         }
-
     }
 
     if ( GNB_ADDR_TYPE_IPV4 == gnb_core->conf->udp_socket_type ) {
@@ -702,12 +706,16 @@ int gnb_send_to_node(gnb_core_t *gnb_core, gnb_node_t *node, gnb_payload16_t *pa
 
 send_by_ipv6:
 
-    if ( (GNB_ADDR_TYPE_IPV6 & addr_type_bits) && (gnb_core->conf->udp_socket_type & GNB_ADDR_TYPE_IPV6) > 0 && memcmp(&node->udp_sockaddr6.sin6_addr,&in6addr_any,sizeof(struct in6_addr)) ) {
-
-        for (i=0; i<gnb_core->conf->udp6_socket_num; i++) {
-            sendto(gnb_core->udp_ipv6_sockets[i],(void *)payload, GNB_PAYLOAD16_FRAME_SIZE(payload), 0, (struct sockaddr *)&node->udp_sockaddr6, sizeof(struct sockaddr_in6) );
+    if ((GNB_ADDR_TYPE_IPV6 & addr_type_bits) && (gnb_core->conf->udp_socket_type & GNB_ADDR_TYPE_IPV6) > 0 && memcmp(&node->udp_sockaddr6.sin6_addr, &in6addr_any, sizeof(struct in6_addr)) != 0) {
+        // 如果已经有PONG状态，说明连接已建立，直接使用对应的socket
+        if (node->udp_addr_status & GNB_NODE_STATUS_IPV6_PONG) {
+            sendto(gnb_core->udp_ipv6_sockets[node->socket6_idx], (void *)payload, GNB_PAYLOAD16_FRAME_SIZE(payload), 0, (struct sockaddr *)&node->udp_sockaddr6, sizeof(struct sockaddr_in6));
+        } else {
+            // 否则，遍历所有socket进行探测
+            for (i = 0; i < gnb_core->conf->udp6_socket_num; i++) {
+                sendto(gnb_core->udp_ipv6_sockets[i], (void *)payload, GNB_PAYLOAD16_FRAME_SIZE(payload), 0, (struct sockaddr *)&node->udp_sockaddr6, sizeof(struct sockaddr_in6));
+            }
         }
-
     }
 
 finish:
