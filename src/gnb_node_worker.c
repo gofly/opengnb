@@ -453,8 +453,10 @@ static void handle_ping_frame(gnb_core_t *gnb_core, gnb_worker_in_data_t *node_w
     payload_attachment->type = GNB_NODE_ATTACHMENT_TYPE_TUN_SOCKADDRESS;
 
     node_attachment_tun_sockaddress_t *attachment_tun_sockaddress = (node_attachment_tun_sockaddress_t *)payload_attachment->data;
+    // 完整填充 IPv4 和 IPv6 的 TUN 地址信息
     memcpy(&attachment_tun_sockaddress->tun_addr4, &gnb_core->local_node->tun_addr4.s_addr, 4);
     attachment_tun_sockaddress->tun_sin_port4 = gnb_core->local_node->tun_sin_port4;
+    memcpy(&attachment_tun_sockaddress->tun_ipv6_addr, &gnb_core->local_node->tun_ipv6_addr, sizeof(struct in6_addr));
 
     snprintf((char *)node_pong_frame->data.text,32,"%llu --PONG-> %llu",gnb_core->local_node->uuid64,src_node->uuid64);
 
@@ -772,6 +774,20 @@ static void sync_node(gnb_worker_t *gnb_node_worker){
 
         }
 
+        // 当双栈都连接时，如果一个协议栈在 GNB_NODE_PING_INTERVAL_SEC 内没有更新，
+        // 则认为该路径可能已失效，主动置0并触发PING
+        if ((node->udp_addr_status & GNB_NODE_STATUS_IPV4_PONG) && (node->udp_addr_status & GNB_NODE_STATUS_IPV6_PONG)) {
+            if ((node_worker_ctx->now_time_sec - node->addr4_update_ts_sec) > GNB_NODE_PING_INTERVAL_SEC) {
+                node->udp_addr_status &= ~GNB_NODE_STATUS_IPV4_PONG;
+                send_ping_frame(gnb_core, node); // 重新探测
+                GNB_LOG2(gnb_core->log, GNB_LOG_ID_NODE_WORKER, "IPv4 path for node %llu seems unstable, re-pinging.\n", node->uuid64);
+            }
+            if ((node_worker_ctx->now_time_sec - node->addr6_update_ts_sec) > GNB_NODE_PING_INTERVAL_SEC) {
+                node->udp_addr_status &= ~GNB_NODE_STATUS_IPV6_PONG;
+                send_ping_frame(gnb_core, node); // 重新探测
+                GNB_LOG2(gnb_core->log, GNB_LOG_ID_NODE_WORKER, "IPv6 path for node %llu seems unstable, re-pinging.\n", node->uuid64);
+            }
+        }
     }
 
 }

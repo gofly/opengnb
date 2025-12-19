@@ -719,8 +719,7 @@ finish:
 
 int gnb_p2p_forward_payload_to_node(gnb_core_t *gnb_core, gnb_node_t *node, gnb_payload16_t *payload){
     int ret = -1;
-    int use_ipv6 = 0;
-    int use_ipv4 = 0;
+    unsigned char addr_type_to_use = 0;
 
     int can_ipv6 = (node->udp_addr_status & GNB_NODE_STATUS_IPV6_PONG) &&
                    (gnb_core->conf->udp_socket_type & GNB_ADDR_TYPE_IPV6) &&
@@ -730,34 +729,47 @@ int gnb_p2p_forward_payload_to_node(gnb_core_t *gnb_core, gnb_node_t *node, gnb_
                    (gnb_core->conf->udp_socket_type & GNB_ADDR_TYPE_IPV4) &&
                    (node->udp_sockaddr4.sin_addr.s_addr != INADDR_ANY);
 
+    int64_t latency4 = node->addr4_ping_latency_usec;
+    int64_t latency6 = node->addr6_ping_latency_usec;
+
     if (can_ipv6 && can_ipv4) {
         // 两条路径都可用，选择延迟更低的
-        // 如果 addr6_ping_latency_usec <= 0，说明延迟未知或无效，优先选IPv4
-        // 如果 addr4_ping_latency_usec <= 0，说明延迟未知或无效，优先选IPv6
-        if (node->addr6_ping_latency_usec > 0 && node->addr4_ping_latency_usec > 0) {
-            if (node->addr6_ping_latency_usec <= node->addr4_ping_latency_usec) {
-                use_ipv6 = 1;
+        if (latency6 > 0 && latency4 > 0) {
+            // 如果IPv6延迟是IPv4的两倍以上，则强制使用IPv4
+            if (latency6 > latency4 * 2) {
+                addr_type_to_use = GNB_ADDR_TYPE_IPV4;
+            // 如果IPv4延迟是IPv6的两倍以上，则强制使用IPv6
+            } else if (latency4 > latency6 * 2) {
+                addr_type_to_use = GNB_ADDR_TYPE_IPV6;
+            // 否则，选择延迟较低的那个
+            } else if (latency6 <= latency4) {
+                addr_type_to_use = GNB_ADDR_TYPE_IPV6;
             } else {
-                use_ipv4 = 1;
+                addr_type_to_use = GNB_ADDR_TYPE_IPV4;
             }
-        } else if (node->addr6_ping_latency_usec > 0) {
-            use_ipv6 = 1;
-        } else { // 默认或仅有IPv4延迟有效时
-            use_ipv4 = 1;
+        } else if (latency6 > 0) {
+            // 只有IPv6延迟有效
+            addr_type_to_use = GNB_ADDR_TYPE_IPV6;
+        } else if (latency4 > 0) {
+            // 只有IPv4延迟有效
+            addr_type_to_use = GNB_ADDR_TYPE_IPV4;
+        } else {
+            // 两个延迟都无效，默认使用IPv4（或可以根据策略选择IPv6）
+            addr_type_to_use = GNB_ADDR_TYPE_IPV4;
         }
     } else if (can_ipv6) {
-        use_ipv6 = 1;
+        addr_type_to_use = GNB_ADDR_TYPE_IPV6;
     } else if (can_ipv4) {
-        use_ipv4 = 1;
+        addr_type_to_use = GNB_ADDR_TYPE_IPV4;
     }
 
-    if (use_ipv6) {
-        sendto(gnb_core->udp_ipv6_sockets[node->socket6_idx],(void *)payload, GNB_PAYLOAD16_FRAME_SIZE(payload), 0, (struct sockaddr *)&node->udp_sockaddr6, sizeof(struct sockaddr_in6) );
-    } else if (use_ipv4) {
-        sendto(gnb_core->udp_ipv4_sockets[node->socket4_idx], (void *)payload, GNB_PAYLOAD16_FRAME_SIZE(payload), 0, (struct sockaddr *)&node->udp_sockaddr4, sizeof(struct sockaddr_in));
+    if (addr_type_to_use & GNB_ADDR_TYPE_IPV6) {
+        ret = sendto(gnb_core->udp_ipv6_sockets[node->socket6_idx],(void *)payload, GNB_PAYLOAD16_FRAME_SIZE(payload), 0, (struct sockaddr *)&node->udp_sockaddr6, sizeof(struct sockaddr_in6) );
+    } else if (addr_type_to_use & GNB_ADDR_TYPE_IPV4) {
+        ret = sendto(gnb_core->udp_ipv4_sockets[node->socket4_idx], (void *)payload, GNB_PAYLOAD16_FRAME_SIZE(payload), 0, (struct sockaddr *)&node->udp_sockaddr4, sizeof(struct sockaddr_in));
     }
 
-    return 0;
+    return ret > 0 ? 0 : -1;
 }
 
 
