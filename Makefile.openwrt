@@ -1,8 +1,9 @@
 USE_MBEDTLS ?= 1
 
-CFLAGS=-ffunction-sections -fdata-sections -Wno-unused-result -I./src -I./libs -I./libs/miniupnpc -I./libs/libnatpmp -I./libs/zlib -D NO_GZIP=1 -D GNB_OPENWRT_BUILD=1
-CLI_LDFLAGS=-Wl,--gc-sections -L/usr/lib -pthread
-GNB_ES_LDFLAGS=-Wl,--gc-sections -L/usr/lib -pthread
+CFLAGS += -ffunction-sections -fdata-sections -Wno-unused-result -I./src -I./libs -I$(STAGING_DIR)/usr/include -I$(STAGING_DIR)/usr/include/miniupnpc -I$(STAGING_DIR)/usr/include/libnatpmp -I$(STAGING_DIR)/usr/include/zlib -D NO_GZIP=1 -D GNB_OPENWRT_BUILD=1
+LDFLAGS += $(TARGET_LDFLAGS)
+CLI_LDFLAGS += -Wl,--gc-sections -pthread
+GNB_ES_LDFLAGS += -Wl,--gc-sections -pthread
 
 ifeq ($(USE_MBEDTLS),1)
 CFLAGS += -DWITH_MBEDTLS=1
